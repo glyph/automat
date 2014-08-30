@@ -1,5 +1,5 @@
 """
-Setup file for mimic
+Setup file for automat
 """
 
 from setuptools import setup, find_packages
