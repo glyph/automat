@@ -28,11 +28,11 @@ class MethodicalState(object):
     A state for a L{MethodicalMachine}.
     """
 
-    def upon(self, anInput, anotherState, someOutput):
+    def upon(self, anInput, enter, output):
         """
         
         """
-        self.machine._oneTransition(self, anInput, anotherState, someOutput)
+        self.machine._oneTransition(self, anInput, enter, output)
 
 
 
