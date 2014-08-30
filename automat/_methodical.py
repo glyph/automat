@@ -28,6 +28,12 @@ class MethodicalState(object):
     A state for a L{MethodicalMachine}.
     """
 
+    def upon(self, anInput, anotherState, someOutput):
+        """
+        
+        """
+        self.machine._oneTransition(self, anInput, anotherState, someOutput)
+
 
 
 @attributes(['machine', 'method'])
@@ -120,21 +126,28 @@ class MethodicalMachine(object):
             L{types.FunctionType}).
         """
         for startState, inputToken, endState, outputTokens in transitions:
-            if not isinstance(startState, MethodicalState):
-                raise NotImplementedError("start state {} isn't a state"
-                                          .format(startState))
-            if not isinstance(inputToken, MethodicalInput):
-                raise NotImplementedError("start state {} isn't an input"
-                                          .format(inputToken))
+            self._oneTransition(startState, inputToken, endState, outputTokens)
+
+
+    def _oneTransition(self, startState, inputToken, endState, outputTokens):
+        """
+        See L{transitions}.
+        """
+        if not isinstance(startState, MethodicalState):
+            raise NotImplementedError("start state {} isn't a state"
+                                      .format(startState))
+        if not isinstance(inputToken, MethodicalInput):
+            raise NotImplementedError("start state {} isn't an input"
+                                      .format(inputToken))
+        if not isinstance(endState, MethodicalState):
+            raise NotImplementedError("end state {} isn't a state"
+                                      .format(startState))
+        for output in outputTokens:
             if not isinstance(endState, MethodicalState):
-                raise NotImplementedError("end state {} isn't a state"
-                                          .format(startState))
-            for output in outputTokens:
-                if not isinstance(endState, MethodicalState):
-                    raise NotImplementedError("output state {} isn't a state"
-                                              .format(endState))
-            self._automaton.addTransition(startState, inputToken, endState,
-                                          tuple(outputTokens))
+                raise NotImplementedError("output state {} isn't a state"
+                                          .format(endState))
+        self._automaton.addTransition(startState, inputToken, endState,
+                                      tuple(outputTokens))
 
 
     def inputFunctionFor(self, oself):

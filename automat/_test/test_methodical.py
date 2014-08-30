@@ -41,10 +41,8 @@ class MethodicalTests(TestCase):
             def _anotherState(self):
                 "another state"
 
-            _machine.transitions([
-                [_anState, anInput, _anotherState, [_anOutput]],
-                [_anotherState, anInput, _anotherState, [_anotherOutput]],
-            ])
+            _anState.upon(anInput, _anotherState, [_anOutput])
+            _anotherState.upon(anInput, _anotherState, [_anotherOutput])
 
         m = Machination()
         self.assertEqual(m.anInput(), ["an-output-value"])
