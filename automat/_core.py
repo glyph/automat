@@ -71,8 +71,17 @@ class Automaton(object):
 
     def states(self):
         """
-        All valid states; Q.
+        All valid states; "Q" in the mathematical description of a state
+        machine.
         """
+        return set(
+            chain.from_iterable(
+                (inState, outState)
+                for
+                (inState, inputSymbol, outState, outputSymbol)
+                in self._transitions
+            )
+        )
 
 
     def outputForInput(self, inState, inputSymbol):

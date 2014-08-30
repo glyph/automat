@@ -27,8 +27,9 @@ class CoreTests(TestCase):
         """
         a = Automaton()
         a.addTransition("beginning", "begin", "ending", ["end"])
-        self.assertEqual(list(a.inputAlphabet()), ["begin"])
-        self.assertEqual(list(a.outputAlphabet()), ["end"])
+        self.assertEqual(a.inputAlphabet(), set(["begin"]))
+        self.assertEqual(a.outputAlphabet(), set(["end"]))
         self.assertEqual(a.outputForInput("beginning", "begin"),
                          ("ending", ["end"]))
+        self.assertEqual(a.states(), set(["beginning", "ending"]))
 
