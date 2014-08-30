@@ -101,7 +101,7 @@ class MethodicalMachine(object):
         def decorator(outputMethod):
             @wraps(outputMethod)
             def wrapper(self):
-                outputMethod(self)
+                return outputMethod(self)
             # is wrapping even necessary? hmm.
             return wrapper
         return decorator
@@ -167,6 +167,8 @@ class MethodicalTransitioner(object):
         )
 
     def doInput(self, methodInput):
+        outputs = []
         for output in self._transitioner.transition(methodInput):
             # TODO: return return value
-            output(self.appobj)
+            outputs.append(output(self.appobj))
+        return outputs
