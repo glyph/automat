@@ -139,8 +139,9 @@ class MethodicalMachine(object):
 
     def inputFunctionFor(self, oself):
         """
-        Get a L{MethodicalTransitioner} associated with C{oself}, creating one
-        if it doesn't exist.
+        Return a function that takes a L{MethodicalInput} and returns values
+        returned by output functions produced by that input in C{oself}'s
+        current state.
         """
         transitioner = getattr(oself, '_transitioner', None)
         if transitioner is None:
