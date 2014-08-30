@@ -1,4 +1,4 @@
-# -*- test-case-name: test_automat -*-
+# -*- test-case-name: automat._test.test_methodical -*-
 
 from functools import wraps
 from characteristic import attributes
@@ -142,33 +142,16 @@ class MethodicalMachine(object):
         Get a L{MethodicalTransitioner} associated with C{oself}, creating one
         if it doesn't exist.
         """
-        doInput = getattr(oself, '_doInput', None)
-        if doInput is not None:
-            return doInput
-        transitioner = MethodicalTransitioner(automaton=self._automaton,
-                                              appobj=oself)
-        oself._doInput = transitioner.doInput
-        return oself._doInput
-
-
-
-@attributes(['automaton', 'appobj'])
-class MethodicalTransitioner(object):
-    """
-    Methodical transitioner.
-    """
-
-    def __init__(self):
-        self._transitioner = Transitioner(
-            self.automaton,
-            # TODO: enforce a single initial state, or figure out a way to
-            # specify it.
-            list(self.automaton._initialStates)[0],
-        )
-
-    def doInput(self, methodInput):
-        outputs = []
-        for output in self._transitioner.transition(methodInput):
-            # TODO: return return value
-            outputs.append(output(self.appobj))
-        return outputs
+        transitioner = getattr(oself, '_transitioner', None)
+        if transitioner is None:
+            transitioner = oself._transitioner = Transitioner(
+                self._automaton,
+                list(self._automaton._initialStates)[0],
+            )
+        def doInput(methodInput):
+            outputs = []
+            for output in transitioner.transition(methodInput):
+                # TODO: return return value
+                outputs.append(output(self))
+            return outputs
+        return doInput
