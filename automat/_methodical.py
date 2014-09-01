@@ -1,6 +1,6 @@
 # -*- test-case-name: automat._test.test_methodical -*-
 
-from functools import wraps
+from functools import wraps, partial
 from characteristic import attributes
 
 from ._core import Transitioner, Automaton
@@ -48,11 +48,7 @@ class MethodicalInput(object):
         """
         Get a callable that will perform the input on the given state.
         """
-        def inputit():
-            # provide the input to the transitioner
-            inputFunction = self.machine.inputFunctionFor(oself)
-            return inputFunction(self)
-        return inputit
+        return self.machine.inputFunctionFor(self, oself)
 
 
 
@@ -184,22 +180,22 @@ class MethodicalMachine(object):
                                       tuple(outputTokens))
 
 
-    def inputFunctionFor(self, oself):
+    def inputFunctionFor(self, methodInput, statefulObject):
         """
-        Return a function that takes a L{MethodicalInput} and returns values
-        returned by output functions produced by that input in C{oself}'s
-        current state.
+        Return a function that takes no arguments and returns values returned
+        by output functions produced by the given L{MethodicalInput} in
+        C{oself}'s current state.
         """
-        transitioner = getattr(oself, '_transitioner', None)
+        transitioner = getattr(statefulObject, '_transitioner', None)
         if transitioner is None:
-            transitioner = oself._transitioner = Transitioner(
+            transitioner = statefulObject._transitioner = Transitioner(
                 self._automaton,
                 list(self._automaton._initialStates)[0],
             )
-        def doInput(methodInput):
+        def doInput():
             outputs = []
             for output in transitioner.transition(methodInput):
                 # TODO: return return value
-                outputs.append(output(self))
+                outputs.append(output(statefulObject))
             return outputs
         return doInput
