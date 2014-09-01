@@ -38,7 +38,7 @@ class MethodicalState(object):
 
 
 
-@attributes(['machine', 'method'])
+@attributes(['automaton', 'method'])
 class MethodicalInput(object):
     """
     An input for a L{MethodicalMachine}.
@@ -46,9 +46,21 @@ class MethodicalInput(object):
 
     def __get__(self, oself, type=None):
         """
-        Get a callable that will perform the input on the given state.
+        Return a function that takes no arguments and returns values returned
+        by output functions produced by the given L{MethodicalInput} in
+        C{oself}'s current state.
         """
-        return self.machine.inputFunctionFor(self, oself)
+        # FIXME: multiple machines on one instance will stomp on each other.
+        transitioner = getattr(oself, '_transitioner', None)
+        if transitioner is None:
+            transitioner = oself._transitioner = Transitioner(
+                self.automaton,
+                # FIXME: public API on Automaton for getting the initial state.
+                list(self.automaton._initialStates)[0],
+            )
+        def doInput():
+            return [output(oself) for output in transitioner.transition(self)]
+        return doInput
 
 
 
@@ -123,7 +135,7 @@ class MethodicalMachine(object):
         This is a decorator for methods.
         """
         def decorator(inputMethod):
-            return MethodicalInput(machine=self,
+            return MethodicalInput(automaton=self._automaton,
                                    method=inputMethod)
         return decorator
 
@@ -178,24 +190,3 @@ class MethodicalMachine(object):
                                           .format(endState))
         self._automaton.addTransition(startState, inputToken, endState,
                                       tuple(outputTokens))
-
-
-    def inputFunctionFor(self, methodInput, statefulObject):
-        """
-        Return a function that takes no arguments and returns values returned
-        by output functions produced by the given L{MethodicalInput} in
-        C{oself}'s current state.
-        """
-        transitioner = getattr(statefulObject, '_transitioner', None)
-        if transitioner is None:
-            transitioner = statefulObject._transitioner = Transitioner(
-                self._automaton,
-                list(self._automaton._initialStates)[0],
-            )
-        def doInput():
-            outputs = []
-            for output in transitioner.transition(methodInput):
-                # TODO: return return value
-                outputs.append(output(statefulObject))
-            return outputs
-        return doInput
