@@ -124,6 +124,23 @@ class MethodicalTests(TestCase):
         self.assertEqual(mm.inputB(), ["B"])
 
 
+    def test_methodName(self):
+        """
+        Input methods preserve their declared names.
+        """
+        class Mech(object):
+            m = MethodicalMachine()
+            @m.input()
+            def declaredInputName(self):
+                "an input"
+            @m.state(initial=True)
+            def aState(self):
+                "state"
+        m = Mech()
+        with self.assertRaises(TypeError) as cm:
+            m.declaredInputName("too", "many", "arguments")
+        self.assertIn("declaredInputName", cm.exception)
+
 # FIXME: error for more than one initial state
 # FIXME: error for wrong types on any call to _oneTransition
 # FIXME: better public API for .upon; maybe a context manager?
