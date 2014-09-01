@@ -56,6 +56,33 @@ class MethodicalInput(object):
 
 
 
+@attributes(['machine', 'method'])
+class MethodicalOutput(object):
+    """
+    An output for a L{MethodicalMachine}.
+    """
+
+    def __get__(self, oself, type=None):
+        """
+        Outputs are private, so raise an exception when we attempt to get one.
+        """
+        raise AttributeError(
+            "{cls}.{method} is a state-machine output method; "
+            "to produce this output, call an input method instead.".format(
+                cls=type.__name__,
+                method=self.method.__name__
+            )
+        )
+
+
+    def __call__(self, oself):
+        """
+        Call the underlying method.
+        """
+        return self.method(oself)
+
+
+
 class MethodicalMachine(object):
     """
     A L{MethodicalMachine} is an interface to an L{Automaton} that uses methods
@@ -64,6 +91,15 @@ class MethodicalMachine(object):
 
     def __init__(self):
         self._automaton = Automaton()
+
+
+    def __get__(self, oself, type=None):
+        """
+        L{MethodicalMachine} is an implementation detail for setting up
+        class-level state; applications should never need to access it on an
+        instance.
+        """
+        raise AttributeError("MethodicalMachine is an implementation detail.")
 
 
     @_keywords_only
@@ -107,11 +143,7 @@ class MethodicalMachine(object):
         state as specified in the L{MethodicalMachine.output} method.
         """
         def decorator(outputMethod):
-            @wraps(outputMethod)
-            def wrapper(self):
-                return outputMethod(self)
-            # is wrapping even necessary? hmm.
-            return wrapper
+            return MethodicalOutput(machine=self, method=outputMethod)
         return decorator
 
 
