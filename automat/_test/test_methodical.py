@@ -90,6 +90,40 @@ class MethodicalTests(TestCase):
             str(cm.exception)
         )
 
+
+    def test_multipleMachines(self):
+        """
+        Two machines may co-exist happily on the same instance; they don't
+        interfere with each other.
+        """
+        class MultiMach(object):
+            a = MethodicalMachine()
+            b = MethodicalMachine()
+
+            @a.input()
+            def inputA(self):
+                "input A"
+            @b.input()
+            def inputB(self):
+                "input B"
+            @a.state(initial=True)
+            def initialA(self):
+                "initial A"
+            @b.state(initial=True)
+            def initialB(self):
+                "initial B"
+            def outputA(self):
+                return "A"
+            def outputB(self):
+                return "B"
+            initialA.upon(inputA, initialA, [outputA])
+            initialB.upon(inputB, initialB, [outputB])
+
+        mm = MultiMach()
+        self.assertEqual(mm.inputA(), ["A"])
+        self.assertEqual(mm.inputB(), ["B"])
+
+
 # FIXME: error for more than one initial state
 # FIXME: error for wrong types on any call to _oneTransition
 # FIXME: better public API for .upon; maybe a context manager?
