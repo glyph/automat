@@ -46,7 +46,7 @@ class MethodicalInput(object):
 
     def __get__(self, oself, type=None):
         """
-        Perform the input.
+        Get a callable that will perform the input on the given state.
         """
         def inputit():
             # provide the input to the transitioner
