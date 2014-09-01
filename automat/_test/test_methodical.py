@@ -90,3 +90,14 @@ class MethodicalTests(TestCase):
             str(cm.exception)
         )
 
+# FIXME: error for more than one initial state
+# FIXME: error for wrong types on any call to _oneTransition
+# FIXME: better public API for .upon; maybe a context manager?
+# FIXME: when transitions are defined, validate that we can always get to
+# terminal? do we care about this?
+# FIXME: implementation (and use-case/example) for passing args from in to out
+
+# FIXME: possibly these need some kind of support from core
+# FIXME: wildcard state (in all states, when input X, emit Y and go to Z)
+# FIXME: wildcard input (in state X, when any input, emit Y and go to Z)
+# FIXME: combined wildcards (in any state for any input, emit Y go to Z)

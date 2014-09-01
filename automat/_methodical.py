@@ -175,18 +175,19 @@ class MethodicalMachine(object):
         """
         See L{transitions}.
         """
-        if not isinstance(startState, MethodicalState):
-            raise NotImplementedError("start state {} isn't a state"
-                                      .format(startState))
-        if not isinstance(inputToken, MethodicalInput):
-            raise NotImplementedError("start state {} isn't an input"
-                                      .format(inputToken))
-        if not isinstance(endState, MethodicalState):
-            raise NotImplementedError("end state {} isn't a state"
-                                      .format(startState))
-        for output in outputTokens:
-            if not isinstance(endState, MethodicalState):
-                raise NotImplementedError("output state {} isn't a state"
-                                          .format(endState))
+        # FIXME: tests for all of this (some of it is wrong)
+        # if not isinstance(startState, MethodicalState):
+        #     raise NotImplementedError("start state {} isn't a state"
+        #                               .format(startState))
+        # if not isinstance(inputToken, MethodicalInput):
+        #     raise NotImplementedError("start state {} isn't an input"
+        #                               .format(inputToken))
+        # if not isinstance(endState, MethodicalState):
+        #     raise NotImplementedError("end state {} isn't a state"
+        #                               .format(startState))
+        # for output in outputTokens:
+        #     if not isinstance(endState, MethodicalState):
+        #         raise NotImplementedError("output state {} isn't a state"
+        #                                   .format(endState))
         self._automaton.addTransition(startState, inputToken, endState,
                                       tuple(outputTokens))

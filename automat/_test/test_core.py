@@ -33,3 +33,6 @@ class CoreTests(TestCase):
                          ("ending", ["end"]))
         self.assertEqual(a.states(), set(["beginning", "ending"]))
 
+# FIXME: addTransition for transition that's been added before
+# FIXME: addTransition with a non-iterable for outputs
+# FIXME: public API for determining initial states
