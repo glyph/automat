@@ -1,6 +1,8 @@
 # -*- test-case-name: automat._test.test_methodical -*-
 
-from functools import wraps, partial
+from functools import wraps
+from itertools import count
+
 from characteristic import attributes
 
 from ._core import Transitioner, Automaton
@@ -38,7 +40,7 @@ class MethodicalState(object):
 
 
 
-@attributes(['automaton', 'method'])
+@attributes(['automaton', 'method', 'symbol'])
 class MethodicalInput(object):
     """
     An input for a L{MethodicalMachine}.
@@ -51,13 +53,14 @@ class MethodicalInput(object):
         C{oself}'s current state.
         """
         # FIXME: multiple machines on one instance will stomp on each other.
-        transitioner = getattr(oself, '_transitioner', None)
+        transitioner = getattr(oself, self.symbol, None)
         if transitioner is None:
-            transitioner = oself._transitioner = Transitioner(
+            transitioner = Transitioner(
                 self.automaton,
                 # FIXME: public API on Automaton for getting the initial state.
                 list(self.automaton._initialStates)[0],
             )
+            setattr(oself, self.symbol, transitioner)
         def doInput():
             return [output(oself) for output in transitioner.transition(self)]
         return doInput
@@ -91,6 +94,15 @@ class MethodicalOutput(object):
 
 
 
+counter = count()
+def gensym():
+    """
+    Create a unique Python identifier.
+    """
+    return "_symbol_" + str(next(counter))
+
+
+
 class MethodicalMachine(object):
     """
     A L{MethodicalMachine} is an interface to an L{Automaton} that uses methods
@@ -99,6 +111,7 @@ class MethodicalMachine(object):
 
     def __init__(self):
         self._automaton = Automaton()
+        self._symbol = gensym()
 
 
     def __get__(self, oself, type=None):
@@ -136,7 +149,8 @@ class MethodicalMachine(object):
         """
         def decorator(inputMethod):
             return MethodicalInput(automaton=self._automaton,
-                                   method=inputMethod)
+                                   method=inputMethod,
+                                   symbol=self._symbol)
         return decorator
 
 
