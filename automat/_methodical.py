@@ -28,11 +28,13 @@ class MethodicalState(object):
     A state for a L{MethodicalMachine}.
     """
 
-    def upon(self, anInput, enter, output):
+    def upon(self, input, enter, outputs):
         """
-        
+        Declare a state transition within the L{MethodicalMachine} associated
+        with this L{MethodicalState}: upon the receipt of the input C{input},
+        enter the state C{enter}, emitting each output in C{outputs}.
         """
-        self.machine._oneTransition(self, anInput, enter, output)
+        self.machine._oneTransition(self, input, enter, outputs)
 
 
 
