@@ -61,6 +61,7 @@ class MethodicalInput(object):
                 list(self.automaton._initialStates)[0],
             )
             setattr(oself, self.symbol, transitioner)
+        @wraps(self.method)
         def doInput():
             return [output(oself) for output in transitioner.transition(self)]
         return doInput
