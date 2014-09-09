@@ -5,7 +5,7 @@ Tests for the public interface of Automat.
 
 from unittest import TestCase
 
-from automat import MethodicalMachine
+from .. import MethodicalMachine
 
 class MethodicalTests(TestCase):
     """
@@ -139,7 +139,7 @@ class MethodicalTests(TestCase):
         m = Mech()
         with self.assertRaises(TypeError) as cm:
             m.declaredInputName("too", "many", "arguments")
-        self.assertIn("declaredInputName", cm.exception)
+        self.assertIn("declaredInputName", str(cm.exception))
 
 # FIXME: error for more than one initial state
 # FIXME: error for wrong types on any call to _oneTransition

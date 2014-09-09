@@ -1,5 +1,5 @@
 
-from automat._core import Automaton
+from .._core import Automaton
 
 from unittest import TestCase
 

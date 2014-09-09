@@ -6,6 +6,7 @@ from itertools import count
 from characteristic import attributes
 
 from ._core import Transitioner, Automaton
+from ._introspection import preserveName
 
 def _keywords_only(f):
     """
@@ -61,6 +62,7 @@ class MethodicalInput(object):
                 list(self.automaton._initialStates)[0],
             )
             setattr(oself, self.symbol, transitioner)
+        @preserveName(self.method)
         @wraps(self.method)
         def doInput():
             return [output(oself) for output in transitioner.transition(self)]
