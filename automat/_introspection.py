@@ -10,6 +10,8 @@ def copycode(template, changes):
         "names", "varnames", "filename", "name", "firstlineno", "lnotab",
         "freevars", "cellvars"
     ]
+    if str is not bytes:
+        names.insert(1, "kwonlyargcount")
     values = [
         changes.get(name, getattr(template, "co_" + name))
         for name in names
@@ -23,7 +25,7 @@ def copyfunction(template, funcchanges, codechanges):
         "globals", "name", "defaults", "closure",
     ]
     values = [
-        funcchanges.get(name, getattr(template, "func_" + name))
+        funcchanges.get(name, getattr(template, "__" + name + "__"))
         for name in names
     ]
     return function(copycode(template.__code__, codechanges), *values)
