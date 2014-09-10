@@ -1,9 +1,12 @@
-# -*- test-case-name: test_automat -*-
+# -*- test-case-name: automat._test.test_methodical -*-
 
 from functools import wraps
+from itertools import count
+
 from characteristic import attributes
 
 from ._core import Transitioner, Automaton
+from ._introspection import preserveName
 
 def _keywords_only(f):
     """
@@ -28,9 +31,17 @@ class MethodicalState(object):
     A state for a L{MethodicalMachine}.
     """
 
+    def upon(self, input, enter, outputs):
+        """
+        Declare a state transition within the L{MethodicalMachine} associated
+        with this L{MethodicalState}: upon the receipt of the input C{input},
+        enter the state C{enter}, emitting each output in C{outputs}.
+        """
+        self.machine._oneTransition(self, input, enter, outputs)
 
 
-@attributes(['machine', 'method'])
+
+@attributes(['automaton', 'method', 'symbol'])
 class MethodicalInput(object):
     """
     An input for a L{MethodicalMachine}.
@@ -38,13 +49,60 @@ class MethodicalInput(object):
 
     def __get__(self, oself, type=None):
         """
-        Perform the input.
+        Return a function that takes no arguments and returns values returned
+        by output functions produced by the given L{MethodicalInput} in
+        C{oself}'s current state.
         """
-        def inputit():
-            # provide the input to the transitioner
-            inputFunction = self.machine.inputFunctionFor(oself)
-            return inputFunction(self)
-        return inputit
+        # FIXME: multiple machines on one instance will stomp on each other.
+        transitioner = getattr(oself, self.symbol, None)
+        if transitioner is None:
+            transitioner = Transitioner(
+                self.automaton,
+                # FIXME: public API on Automaton for getting the initial state.
+                list(self.automaton._initialStates)[0],
+            )
+            setattr(oself, self.symbol, transitioner)
+        @preserveName(self.method)
+        @wraps(self.method)
+        def doInput():
+            return [output(oself) for output in transitioner.transition(self)]
+        return doInput
+
+
+
+@attributes(['machine', 'method'])
+class MethodicalOutput(object):
+    """
+    An output for a L{MethodicalMachine}.
+    """
+
+    def __get__(self, oself, type=None):
+        """
+        Outputs are private, so raise an exception when we attempt to get one.
+        """
+        raise AttributeError(
+            "{cls}.{method} is a state-machine output method; "
+            "to produce this output, call an input method instead.".format(
+                cls=type.__name__,
+                method=self.method.__name__
+            )
+        )
+
+
+    def __call__(self, oself):
+        """
+        Call the underlying method.
+        """
+        return self.method(oself)
+
+
+
+counter = count()
+def gensym():
+    """
+    Create a unique Python identifier.
+    """
+    return "_symbol_" + str(next(counter))
 
 
 
@@ -56,6 +114,16 @@ class MethodicalMachine(object):
 
     def __init__(self):
         self._automaton = Automaton()
+        self._symbol = gensym()
+
+
+    def __get__(self, oself, type=None):
+        """
+        L{MethodicalMachine} is an implementation detail for setting up
+        class-level state; applications should never need to access it on an
+        instance.
+        """
+        raise AttributeError("MethodicalMachine is an implementation detail.")
 
 
     @_keywords_only
@@ -83,8 +151,9 @@ class MethodicalMachine(object):
         This is a decorator for methods.
         """
         def decorator(inputMethod):
-            return MethodicalInput(machine=self,
-                                   method=inputMethod)
+            return MethodicalInput(automaton=self._automaton,
+                                   method=inputMethod,
+                                   symbol=self._symbol)
         return decorator
 
 
@@ -99,11 +168,7 @@ class MethodicalMachine(object):
         state as specified in the L{MethodicalMachine.output} method.
         """
         def decorator(outputMethod):
-            @wraps(outputMethod)
-            def wrapper(self):
-                outputMethod(self)
-            # is wrapping even necessary? hmm.
-            return wrapper
+            return MethodicalOutput(machine=self, method=outputMethod)
         return decorator
 
 
@@ -120,53 +185,26 @@ class MethodicalMachine(object):
             L{types.FunctionType}).
         """
         for startState, inputToken, endState, outputTokens in transitions:
-            if not isinstance(startState, MethodicalState):
-                raise NotImplementedError("start state {} isn't a state"
-                                          .format(startState))
-            if not isinstance(inputToken, MethodicalInput):
-                raise NotImplementedError("start state {} isn't an input"
-                                          .format(inputToken))
-            if not isinstance(endState, MethodicalState):
-                raise NotImplementedError("end state {} isn't a state"
-                                          .format(startState))
-            for output in outputTokens:
-                if not isinstance(endState, MethodicalState):
-                    raise NotImplementedError("output state {} isn't a state"
-                                              .format(endState))
-            self._automaton.addTransition(startState, inputToken, endState,
-                                          tuple(outputTokens))
+            self._oneTransition(startState, inputToken, endState, outputTokens)
 
 
-    def inputFunctionFor(self, oself):
+    def _oneTransition(self, startState, inputToken, endState, outputTokens):
         """
-        Get a L{MethodicalTransitioner} associated with C{oself}, creating one
-        if it doesn't exist.
+        See L{transitions}.
         """
-        doInput = getattr(oself, '_doInput', None)
-        if doInput is not None:
-            return doInput
-        transitioner = MethodicalTransitioner(automaton=self._automaton,
-                                              appobj=oself)
-        oself._doInput = transitioner.doInput
-        return oself._doInput
-
-
-
-@attributes(['automaton', 'appobj'])
-class MethodicalTransitioner(object):
-    """
-    Methodical transitioner.
-    """
-
-    def __init__(self):
-        self._transitioner = Transitioner(
-            self.automaton,
-            # TODO: enforce a single initial state, or figure out a way to
-            # specify it.
-            list(self.automaton._initialStates)[0],
-        )
-
-    def doInput(self, methodInput):
-        for output in self._transitioner.transition(methodInput):
-            # TODO: return return value
-            output(self.appobj)
+        # FIXME: tests for all of this (some of it is wrong)
+        # if not isinstance(startState, MethodicalState):
+        #     raise NotImplementedError("start state {} isn't a state"
+        #                               .format(startState))
+        # if not isinstance(inputToken, MethodicalInput):
+        #     raise NotImplementedError("start state {} isn't an input"
+        #                               .format(inputToken))
+        # if not isinstance(endState, MethodicalState):
+        #     raise NotImplementedError("end state {} isn't a state"
+        #                               .format(startState))
+        # for output in outputTokens:
+        #     if not isinstance(endState, MethodicalState):
+        #         raise NotImplementedError("output state {} isn't a state"
+        #                                   .format(endState))
+        self._automaton.addTransition(startState, inputToken, endState,
+                                      tuple(outputTokens))

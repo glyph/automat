@@ -1,9 +1,12 @@
+# -*- test-case-name: automat._test.test_core -*-
 
 """
 A core state-machine abstraction.
 
 Perhaps something that could be replaced with or integrated into machinist.
 """
+
+from itertools import chain
 
 
 class Automaton(object):
@@ -27,7 +30,7 @@ class Automaton(object):
         Add the given transition to the outputSymbol.
         """
         self._transitions.add(
-            (inState, inputSymbol, outState, outputSymbols)
+            (inState, inputSymbol, outState, tuple(outputSymbols))
         )
 
 
@@ -57,14 +60,28 @@ class Automaton(object):
         """
         The full set of symbols which can be produced by this automaton.
         """
-        return set(outputSymbols for (inState, inputSymbol, outState,
-                                      outputSymbols) in self._transitions)
+        return set(
+            chain.from_iterable(
+                outputSymbols for
+                (inState, inputSymbol, outState, outputSymbols)
+                in self._transitions
+            )
+        )
 
 
     def states(self):
         """
-        All valid states; Q.
+        All valid states; "Q" in the mathematical description of a state
+        machine.
         """
+        return set(
+            chain.from_iterable(
+                (inState, outState)
+                for
+                (inState, inputSymbol, outState, outputSymbol)
+                in self._transitions
+            )
+        )
 
 
     def outputForInput(self, inState, inputSymbol):
@@ -74,7 +91,7 @@ class Automaton(object):
         for (anInState, anInputSymbol,
              outState, outputSymbols) in self._transitions:
             if (inState, inputSymbol) == (anInState, anInputSymbol):
-                return (outState, outputSymbols)
+                return (outState, list(outputSymbols))
         raise NotImplementedError("no transition for {} in {}"
                                   .format(inputSymbol, inState))
 
