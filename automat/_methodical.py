@@ -208,3 +208,17 @@ class MethodicalMachine(object):
         #                                   .format(endState))
         self._automaton.addTransition(startState, inputToken, endState,
                                       tuple(outputTokens))
+
+
+    def graphviz(self):
+        """
+        
+        """
+        from ._visualize import graphviz
+        for line in graphviz(
+                self._automaton,
+                stateAsString=lambda state: state.method.__name__,
+                inputAsString=lambda input: input.method.__name__,
+                outputAsString=lambda output: output.method.__name__,
+        ):
+            yield line

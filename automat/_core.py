@@ -34,6 +34,13 @@ class Automaton(object):
         )
 
 
+    def allTransitions(self):
+        """
+        All transitions.
+        """
+        return frozenset(self._transitions)
+
+
     def addInitialState(self, state):
         """
         Add the given atom to the set of initial states.
@@ -74,7 +81,7 @@ class Automaton(object):
         All valid states; "Q" in the mathematical description of a state
         machine.
         """
-        return set(
+        return frozenset(
             chain.from_iterable(
                 (inState, outState)
                 for
@@ -82,6 +89,13 @@ class Automaton(object):
                 in self._transitions
             )
         )
+
+
+    def initialStates(self):
+        """
+        
+        """
+        return frozenset(self._initialStates)
 
 
     def outputForInput(self, inState, inputSymbol):
