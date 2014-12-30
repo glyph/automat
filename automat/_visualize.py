@@ -22,6 +22,9 @@ def graphviz(automaton, inputAsString=repr,
     # yield "pad=0.25;\n"
     # yield 'splines="curved";\n'
     yield "graph[pack=true,dpi=100]\n"
+    yield 'node[fontname="Menlo"]\n'
+    yield 'edge[fontname="Menlo"]\n'
+
     for state in automaton.states():
         if state in automaton.initialStates():
             stateShape = "doubleoctagon"
