@@ -3,6 +3,10 @@
 def _gvquote(s):
     return '"{}"'.format(s.replace('"', r'\"'))
 
+def _gvhtml(s):
+    return '<{}>'.format(s)
+
+
 def graphviz(automaton, inputAsString=repr,
              outputAsString=repr,
              stateAsString=repr):
@@ -17,34 +21,34 @@ def graphviz(automaton, inputAsString=repr,
     yield "digraph {\n"
     # yield "pad=0.25;\n"
     # yield 'splines="curved";\n'
-    yield "pack=true;\n"
+    yield "graph[pack=true,dpi=100]\n"
     for state in automaton.states():
         if state in automaton.initialStates():
             stateShape = "doubleoctagon"
         else:
             stateShape = "octagon"
-        yield ('  {} [shape="{}"];'
+        yield ('  {} [shape="{}"]\n'
                .format(_gvquote(stateAsString(state)), stateShape))
     for n, eachTransition in enumerate(automaton.allTransitions()):
         inState, inputSymbol, outState, outputSymbols = eachTransition
+        thisTransition = "t{}".format(n)
         inputLabel = inputAsString(inputSymbol)
-        thisInput = _gvquote("input({}):\n".format(n) + inputLabel)
-        theseOutputs = ""
+        table = ('<table port="tableport"><tr><td colspan="{}">{}</td></tr>'
+                 '<tr>').format(len(outputSymbols), inputLabel)
         for eachOutput in outputSymbols:
             outputLabel = outputAsString(eachOutput)
-            anOutput = _gvquote("output({}):\n".format(n) +
-                                outputLabel)
-            yield ("  {} [shape=larrow margin=0.2 label={}];\n"
-                   .format(anOutput, outputLabel)
-            )
-            theseOutputs += " -> {}".format(anOutput)
-        yield '    {} [shape=rarrow margin=0.2 label={}];\n'.format(
-            thisInput, _gvquote(inputLabel)
+            table += "<td>{}</td>".format(outputLabel)
+        table += "</tr></table>"
+
+        yield '    {} [shape=none margin=0.2 label={}]\n'.format(
+            thisTransition, _gvhtml(table)
         )
-        yield '    {} -> {} {} -> {} [color=grey];\n'.format(
+        yield '    {} -> {}:tableport:w[arrowhead=none]\n'.format(
             _gvquote(stateAsString(inState)),
-            thisInput,
-            theseOutputs,
+            thisTransition,
+        )
+        yield '    {}:tableport:e -> {}\n'.format(
+            thisTransition,
             _gvquote(stateAsString(outState)),
         )
     yield "}\n"
