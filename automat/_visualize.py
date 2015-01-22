@@ -27,20 +27,27 @@ def graphviz(automaton, inputAsString=repr,
 
     for state in automaton.states():
         if state in automaton.initialStates():
-            stateShape = "doubleoctagon"
+            stateShape = "bold"
+            fontName = "Menlo-Bold"
         else:
-            stateShape = "octagon"
-        yield ('  {} [shape="{}"]\n'
-               .format(_gvquote(stateAsString(state)), stateShape))
+            stateShape = ""
+            fontName = "Menlo"
+        yield ('  {} [fontname="{}" shape="ellipse" style="{}" color="blue"]\n'
+               .format(_gvquote(stateAsString(state)), fontName, stateShape))
     for n, eachTransition in enumerate(automaton.allTransitions()):
         inState, inputSymbol, outState, outputSymbols = eachTransition
         thisTransition = "t{}".format(n)
         inputLabel = inputAsString(inputSymbol)
-        table = ('<table port="tableport"><tr><td colspan="{}">{}</td></tr>'
-                 '<tr>').format(len(outputSymbols), inputLabel)
+        table = (
+            '<table port="tableport">'
+            '<tr><td color="purple" colspan="{}">'
+            '<font face="menlo-italic">{}</font></td></tr>'
+            '<tr>').format(len(outputSymbols), inputLabel)
         for eachOutput in outputSymbols:
             outputLabel = outputAsString(eachOutput)
-            table += "<td>{}</td>".format(outputLabel)
+            table += (
+                '<td color="pink"><font point-size="9">{}</font></td>'
+                .format(outputLabel))
         table += "</tr></table>"
 
         yield '    {} [shape=none margin=0.2 label={}]\n'.format(
