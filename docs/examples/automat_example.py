@@ -29,7 +29,7 @@ class FoodSlot(object):
     def __init__(self, door, light):
         self._door = door
         self._light = light
-        self._start()
+        self.start()
 
     @machine.state(initial=True)
     def initial(self):
@@ -117,17 +117,20 @@ class FoodSlot(object):
         (ready, coin, serving, [unlockDoor]),
         (serving, closeDoor, empty, [lockDoor, turnOnFoodLight]),
     ])
+
+
+
+
+slot = FoodSlot(Door(), Light())
+if __name__ == '__main__':
     import sys
-    sys.stdout.writelines(machine.graphviz())
-
-
-# slot = FoodSlot(Door(), Light())
-# raw_input("Hit enter to make some food and put it in the slot: ")
-# slot.food()
-# raw_input("Hit enter to insert a coin: ")
-# slot.coin()
-# raw_input("Hit enter to retrieve the food and close the door: ")
-# slot.closeDoor()
-# raw_input("Hit enter to make some more food: ")
-# slot.food()
+    sys.stdout.writelines(FoodSlot.machine.graphviz())
+    # raw_input("Hit enter to make some food and put it in the slot: ")
+    # slot.food()
+    # raw_input("Hit enter to insert a coin: ")
+    # slot.coin()
+    # raw_input("Hit enter to retrieve the food and close the door: ")
+    # slot.closeDoor()
+    # raw_input("Hit enter to make some more food: ")
+    # slot.food()
 
