@@ -34,12 +34,9 @@ class Turnstile(object):
     def _unlocked(self):
         "The turnstile is unlocked."
 
-    machine.transitions([
-        # state     input       out-state  outputs
-        (_locked,   fare_paid,  _unlocked, [_disengage_lock]),
-        (_unlocked, arm_turned, _locked,   [_engage_lock]),
-        (_locked,   arm_turned, _locked,   [_nope]),
-    ])
+    _locked.upon(fare_paid, enter=_unlocked, outputs=[_disengage_lock])
+    _unlocked.upon(arm_turned, enter=_locked, outputs=[_engage_lock])
+    _locked.upon(arm_turned, enter=_locked, outputs=[_nope])
 
 class Lock(object):
     "A sample I/O device."
