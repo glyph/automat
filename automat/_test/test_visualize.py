@@ -40,7 +40,7 @@ def sampleMachine():
         @mm.output()
         def out(self):
             pass
-        mm.transitions([(begin, go, end, [out])])
+        begin.upon(go, end, [out])
     so = SampleObject()
     so.go()
     return mm
