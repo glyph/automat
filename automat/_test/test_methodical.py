@@ -81,12 +81,24 @@ class MethodicalTests(TestCase):
         """
         class Machination(object):
             machine = MethodicalMachine()
+            counter = 0
+            @machine.input()
+            def anInput(self):
+                "an input"
             @machine.output()
             def anOutput(self):
-                return 1 / 0
-        machination = Machination()
+                self.counter += 1
+            @machine.state(initial=True)
+            def state(self):
+                "a machine state"
+            state.upon(anInput, enter=state, outputs=[anOutput])
+        mach1 = Machination()
+        mach1.anInput()
+        self.assertEqual(mach1.counter, 1)
+        mach2 = Machination()
         with self.assertRaises(AttributeError) as cm:
-            machination.anOutput
+            mach2.anOutput
+        self.assertEqual(mach2.counter, 0)
 
         self.assertIn(
             "Machination.anOutput is a state-machine output method; to "
