@@ -28,16 +28,16 @@ def sampleMachine():
     class SampleObject(object):
         @mm.state(initial=True)
         def begin(self):
-            pass
+            "initial state"
         @mm.state()
         def end(self):
-            pass
+            "end state"
         @mm.input()
         def go(self):
-            pass
+            "sample input"
         @mm.output()
         def out(self):
-            pass
+            "sample output"
         begin.upon(go, end, [out])
     so = SampleObject()
     so.go()
