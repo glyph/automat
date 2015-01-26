@@ -1,4 +1,5 @@
 
+from __future__ import unicode_literals
 
 def _gvquote(s):
     return '"{}"'.format(s.replace('"', r'\"'))

@@ -1,4 +1,6 @@
 
+from __future__ import unicode_literals
+
 import os
 import subprocess
 from unittest import TestCase, skipIf
@@ -55,7 +57,8 @@ class IntegrationTests(TestCase):
         """
         p = subprocess.Popen("dot", stdin=subprocess.PIPE,
                              stdout=subprocess.PIPE)
-        out, err = p.communicate("".join(sampleMachine().graphviz()))
+        out, err = p.communicate("".join(sampleMachine().graphviz())
+                                 .encode("utf-8"))
         self.assertEqual(p.returncode, 0)
 
 
