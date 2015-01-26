@@ -27,19 +27,22 @@ def sampleMachine():
     Create a sample L{MethodicalMachine} with some sample states.
     """
     mm = MethodicalMachine()
-    @mm.state(initial=True)
-    def begin(result):
-        pass
-    @mm.state()
-    def end(result):
-        pass
-    @mm.input()
-    def go(result):
-        pass
-    @mm.output()
-    def out(result):
-        pass
-    mm.transitions([(begin, go, end, [out])])
+    class SampleObject(object):
+        @mm.state(initial=True)
+        def begin(self):
+            pass
+        @mm.state()
+        def end(self):
+            pass
+        @mm.input()
+        def go(self):
+            pass
+        @mm.output()
+        def out(self):
+            pass
+        mm.transitions([(begin, go, end, [out])])
+    so = SampleObject()
+    so.go()
     return mm
 
 
