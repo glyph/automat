@@ -111,12 +111,11 @@ class FoodSlot(object):
         The door was closed.
         """
 
-    _machine.transitions([
-        (_initial, _start, _empty, [_lockDoor, _turnOnFoodLight]),
-        (_empty, food, _ready, [_turnOffFoodLight]),
-        (_ready, coin, _serving, [_unlockDoor]),
-        (_serving, closeDoor, _empty, [_lockDoor, _turnOnFoodLight]),
-    ])
+    _initial.upon(_start, enter=_empty, outputs=[_lockDoor, _turnOnFoodLight])
+    _empty.upon(food, enter=_ready, outputs=[_turnOffFoodLight])
+    _ready.upon(coin, enter=_serving, outputs=[_unlockDoor])
+    _serving.upon(closeDoor, enter=_empty, outputs=[_lockDoor,
+                                                    _turnOnFoodLight])
 
 
 slot = FoodSlot(Door(), Light())

@@ -172,25 +172,9 @@ class MethodicalMachine(object):
         return decorator
 
 
-    def transitions(self, transitions):
-        """
-        Declare a set of transitions.
-
-        @param transitions: a L{list} of 4-tuples of (startState - a method
-            decorated with C{@state()}, inputToken - a method decorated with
-            C{@input()}, endState - a method decorated with C{@state()},
-            outputTokens - a method decorated with C{@output()}).
-        @type transitions: L{list} of 4-L{tuples} of (L{MethodicalState},
-            L{MethodicalInput}, L{MethodicalState}, L{list} of
-            L{types.FunctionType}).
-        """
-        for startState, inputToken, endState, outputTokens in transitions:
-            self._oneTransition(startState, inputToken, endState, outputTokens)
-
-
     def _oneTransition(self, startState, inputToken, endState, outputTokens):
         """
-        See L{transitions}.
+        See L{MethodicalState.upon}.
         """
         # FIXME: tests for all of this (some of it is wrong)
         # if not isinstance(startState, MethodicalState):

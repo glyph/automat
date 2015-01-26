@@ -120,17 +120,21 @@ in it.
         "The user put in some beans."
 ```
 
-Finally, you hook everything together with the `transitions` method:
+Finally, you hook everything together with the `upon` method of the functions
+decorated with `machine.state`:
 
 ```python
-    machine.transitions([
-        # If we don't have beans, and we put in beans, then we have beans
-        # (and produce no output)
-        (dont_have_beans, put_in_beans, have_beans, []),
-        # If we do have beans, and we press the brew button, we should heat the
-        # heating element.
-        (have_beans, brew_button, dont_have_beans, [_heat_the_heating_element]),
-    ])
+
+    # When we don't have beans, upon putting in beans, we will then have beans
+    # (and produce no output)
+    dont_have_beans.upon(put_in_beans, enter=have_beans, outputs=[])
+
+    # When we have beans, upon pressing the brew button, we will then not have
+    # beans any more (as they have been entered into the brewing chamber) and
+    # our output will be heating the heating element.
+
+    have_beans.upon(put_in_beans, enter=dont_have_beans,
+                    outputs=[_heat_the_heating_element])
 ```
 
 To *users* of this coffee machine class though, it still looks like a POPO
@@ -144,9 +148,9 @@ To *users* of this coffee machine class though, it still looks like a POPO
 
 All of the *inputs* are provided by calling them like methods, all of the
 *outputs* are automatically invoked when they are produced according to the
-transitions specified to `transitions` and all of the states are simply opaque
-tokens - although the fact that they're defined as methods like inputs and
-outputs allows you to put docstrings on them easily to document them.
+outputs specified to `upon` and all of the states are simply opaque tokens -
+although the fact that they're defined as methods like inputs and outputs
+allows you to put docstrings on them easily to document them.
 
 More comprehensive (tested, working) examples are present in `docs/examples`.
 

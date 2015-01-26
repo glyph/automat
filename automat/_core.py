@@ -22,7 +22,6 @@ class Automaton(object):
         """
         self._initialStates = set()
         self._transitions = set()
-        self._finalStates = set()
 
 
     def addTransition(self, inState, inputSymbol, outState, outputSymbols):
@@ -39,13 +38,6 @@ class Automaton(object):
         Add the given atom to the set of initial states.
         """
         self._initialStates.add(state)
-
-
-    def addFinalState(self, state):
-        """
-        Add the given atom to the set of final states.
-        """
-        self._finalStates.add(state)
 
 
     def inputAlphabet(self):
