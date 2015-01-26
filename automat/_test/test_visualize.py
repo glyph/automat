@@ -14,9 +14,7 @@ def isGraphvizInstalled():
     r, w = os.pipe()
     os.close(w)
     try:
-        return not subprocess.call("dot", stdin=r)
-    except:
-        return False
+        return not subprocess.call("dot", stdin=r, shell=True)
     finally:
         os.close(r)
 
