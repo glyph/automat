@@ -215,7 +215,11 @@ class MethodicalMachine(object):
 
     def graphviz(self):
         """
-        
+        Visualize this state machine using graphviz.
+
+        @return: an iterable of lines of graphviz-format data suitable for
+            feeding to C{dot} or C{neato} which visualizes the state machine
+            described by this L{MethodicalMachine}.
         """
         from ._visualize import graphviz
         for line in graphviz(
