@@ -120,8 +120,8 @@ class FoodSlot(object):
 
 
 
-
 slot = FoodSlot(Door(), Light())
+
 if __name__ == '__main__':
     import sys
     sys.stdout.writelines(FoodSlot.machine.graphviz())

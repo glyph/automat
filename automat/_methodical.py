@@ -123,7 +123,10 @@ class MethodicalMachine(object):
         class-level state; applications should never need to access it on an
         instance.
         """
-        raise AttributeError("MethodicalMachine is an implementation detail.")
+        if oself is not None:
+            raise AttributeError(
+                "MethodicalMachine is an implementation detail.")
+        return self
 
 
     @_keywords_only
