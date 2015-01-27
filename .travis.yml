@@ -8,6 +8,7 @@ env:
     - TOX_ENV=pypy
 
 install:
+    - apt-get install graphviz
     - pip install tox coveralls
 
 script:
