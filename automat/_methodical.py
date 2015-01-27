@@ -123,7 +123,10 @@ class MethodicalMachine(object):
         class-level state; applications should never need to access it on an
         instance.
         """
-        raise AttributeError("MethodicalMachine is an implementation detail.")
+        if oself is not None:
+            raise AttributeError(
+                "MethodicalMachine is an implementation detail.")
+        return self
 
 
     @_keywords_only
@@ -192,3 +195,21 @@ class MethodicalMachine(object):
         #                                   .format(endState))
         self._automaton.addTransition(startState, inputToken, endState,
                                       tuple(outputTokens))
+
+
+    def graphviz(self):
+        """
+        Visualize this state machine using graphviz.
+
+        @return: an iterable of lines of graphviz-format data suitable for
+            feeding to C{dot} or C{neato} which visualizes the state machine
+            described by this L{MethodicalMachine}.
+        """
+        from ._visualize import graphviz
+        for line in graphviz(
+                self._automaton,
+                stateAsString=lambda state: state.method.__name__,
+                inputAsString=lambda input: input.method.__name__,
+                outputAsString=lambda output: output.method.__name__,
+        ):
+            yield line
