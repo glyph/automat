@@ -167,15 +167,95 @@ adding a parameter, so that's how you do it in Automat as well.
         "The user put in some beans."
 ```
 
-However, one important difference here is that we can't add any implememntation
-code to the input method; the change in the state of the coffee machine must be
-represented as an output.
+However, one important difference here is that *we can't add any
+implememntation code to the input method*.  Inputs are purely a declaration of
+the interface; the behavior must all come from outputs.  Therefore, the change
+in the state of the coffee machine must be represented as an output.  We can
+add an output method like this:
+
+```python
+    @_machine.output()
+    def _save_beans(self, beans):
+        "The beans are now in the machine; save them."
+        self._beans = beans
+```
+
+and then connect it to the `put_in_beans` by changing the transition from
+`dont_have_beans` to `have_beans` like so:
+
+```python
+    dont_have_beans.upon(put_in_beans, enter=have_beans,
+                         outputs=[_save_beans])
+```
+
+Now, when you call:
+
+```python
+coffee_machine.put_in_beans("real good beans")
+```
+
+the machine will remember the beans for later.
+
+So how do we get the beans back out again?  One of our outputs needs to have a
+return value.  It would make sense if our `brew_button` method returned the cup
+of coffee that it made, so we should add an output.  So, in addition to heating
+the heating element, let's add a return value that describes the coffee.  First
+a new output:
+
+```python
+    @_machine.output()
+    def _describe_coffee(self):
+        return "A cup of coffee made with {}.".format(self._beans)
+```
+
+Note that we don't need to check first whether `self._beans` exists or not,
+because we can only reach this output method if the state machine says we've
+gone through a set of states that sets this attribute.
+
+Now, we need to hook up `_describe_coffee` to the process of brewing, so change
+the brewing transition to:
+
+```python
+    have_beans.upon(brew_button, enter=dont_have_beans,
+                    outputs=[_heat_the_heating_element,
+                             _describe_coffee])
+```
+
+Now, we can call it:
+
+```python
+>>> coffee_machine.brew_button()
+[None, 'A cup of coffee made with real good beans.']
+```
+
+Except... wait a second, what's that `None` doing there?
+
+Since every input can produce multiple outputs, in automat, the default return
+value from every input invocation is a `list`.  In this case, we have both
+`_heat_the_heating_element` and `_describe_coffee` outputs, so we're seeing
+both of their return values.  However, this can be customized, with the
+`collector` argument to `upon`; the `collector` is a callable which takes an
+iterable of all the outputs' return values and "collects" a single return value
+to return to the caller of the state machine.
+
+In this case, we only care about the last output, so we can adjust the call to
+`upon` like this:
+
+```python
+    have_beans.upon(brew_button, enter=dont_have_beans,
+                    outputs=[_heat_the_heating_element,
+                             _describe_coffee],
+                    collector=lambda iterable: list(iterable)[-1]
+    )
+```
+
+And now, we'll get just the return value we want:
+
+```python
+>>> coffee_machine.brew_button()
+'A cup of coffee made with real good beans.'
+```
 
 More comprehensive (tested, working) examples are present in `docs/examples`.
 
-### What is the status of Automat? ###
-
-The main missing component of Automat at this point is a mechanism to serialize
-the current state.
-
-
+Go forth and machine all the state!
