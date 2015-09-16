@@ -151,6 +151,53 @@ outputs specified to `upon` and all of the states are simply opaque tokens -
 although the fact that they're defined as methods like inputs and outputs
 allows you to put docstrings on them easily to document them.
 
+## How do I get the current state of a state machine?
+
+Don't do that.
+
+One major reason for having a state machine is that you want the callers of the
+state machine to just provide the appropriate input to the machine at the
+appropriate time, and *not have to check themselves* what state the machine is
+in.  So if you are tempted to write some code like this:
+
+```python
+if connection_state_machine.state == "CONNECTED":
+    connection_state_machine.send_message()
+else:
+    print("not connected")
+```
+
+Instead, just make your calling code do this:
+
+```python
+connection_state_machine.send_message()
+```
+
+and then change your state machine to look like this:
+
+```python
+    @machine.state()
+    def connected(self):
+        "connected"
+    @machine.state()
+    def not_connected(self):
+        "not connected"
+    @machine.input()
+    def send_message(self):
+        "send a message"
+    @machine.output()
+    def _actually_send_message(self):
+        self._transport.send(b"message")
+    @machine.output()
+    def _report_sending_failure(self):
+        print("not connected")
+    connected.upon(send_message, connected, [_actually_send_message])
+    not_connected.upon(send_message, not_connected, [_report_sending_failure])
+```
+
+so that the responsibility for knowing which state the state machine is in
+remains within the state machine itself.
+
 ## Input for Inputs and Output for Outputs
 
 Quite often you want to be able to pass parameters to your methods, as well as
