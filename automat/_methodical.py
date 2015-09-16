@@ -2,6 +2,7 @@
 
 from functools import wraps
 from itertools import count
+from inspect import getargspec
 
 from characteristic import attributes
 
@@ -37,6 +38,19 @@ class MethodicalState(object):
         with this L{MethodicalState}: upon the receipt of the input C{input},
         enter the state C{enter}, emitting each output in C{outputs}.
         """
+        inputSpec = getargspec(input.method)
+        for output in outputs:
+            outputSpec = getargspec(output.method)
+            if inputSpec != outputSpec:
+                raise TypeError(
+                    "method {input} signature {inputSignature} "
+                    "does not match output {output} "
+                    "signature {outputSignature}".format(
+                        input=input.method.__name__,
+                        output=output.method.__name__,
+                        inputSignature=inputSpec,
+                        outputSignature=outputSpec,
+                ))
         self.machine._oneTransition(self, input, enter, outputs)
 
 
@@ -64,8 +78,10 @@ class MethodicalInput(object):
             setattr(oself, self.symbol, transitioner)
         @preserveName(self.method)
         @wraps(self.method)
-        def doInput():
-            return [output(oself) for output in transitioner.transition(self)]
+        def doInput(*args, **kwargs):
+            self.method(oself, *args, **kwargs)
+            return [output(oself, *args, **kwargs)
+                    for output in transitioner.transition(self)]
         return doInput
 
 
@@ -89,11 +105,11 @@ class MethodicalOutput(object):
         )
 
 
-    def __call__(self, oself):
+    def __call__(self, oself, *args, **kwargs):
         """
         Call the underlying method.
         """
-        return self.method(oself)
+        return self.method(oself, *args, **kwargs)
 
 
 

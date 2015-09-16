@@ -128,8 +128,10 @@ class MethodicalTests(TestCase):
             @b.state(initial=True)
             def initialB(self):
                 "initial B"
+            @a.output()
             def outputA(self):
                 return "A"
+            @b.output()
             def outputB(self):
                 return "B"
             initialA.upon(inputA, initialA, [outputA])
@@ -156,6 +158,56 @@ class MethodicalTests(TestCase):
         with self.assertRaises(TypeError) as cm:
             m.declaredInputName("too", "many", "arguments")
         self.assertIn("declaredInputName", str(cm.exception))
+
+
+    def test_inputWithArguments(self):
+        """
+        If an input takes an argument, it will pass that along to its output.
+        """
+        class Mechanism(object):
+            m = MethodicalMachine()
+            @m.input()
+            def input(self, x, y=1):
+                pass
+            @m.state(initial=True)
+            def state(self):
+                pass
+            @m.output()
+            def output(self, x, y=1):
+                self._x = x
+                return x + y
+            state.upon(input, state, [output])
+
+        m = Mechanism()
+        self.assertEqual(m.input(3), [4])
+        self.assertEqual(m._x, 3)
+
+
+    def test_inputOutputMismatch(self):
+        """
+        All the argument lists of the outputs for a given input must match; if
+        one does not the call to C{upon} will raise a C{TypeError}.
+        """
+        class Mechanism(object):
+            m = MethodicalMachine()
+            @m.input()
+            def nameOfInput(self, a):
+                pass
+            @m.output()
+            def outputThatMatches(self, a):
+                pass
+            @m.output()
+            def outputThatDoesntMatch(self, b):
+                pass
+            @m.state()
+            def state(self):
+                pass
+            with self.assertRaises(TypeError) as cm:
+                state.upon(nameOfInput, state, [outputThatMatches,
+                                                outputThatDoesntMatch])
+            self.assertIn("nameOfInput", str(cm.exception))
+            self.assertIn("outputThatDoesntMatch", str(cm.exception))
+
 
 # FIXME: error for more than one initial state
 # FIXME: error for wrong types on any call to _oneTransition
