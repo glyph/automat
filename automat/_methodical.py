@@ -1,10 +1,10 @@
 # -*- test-case-name: automat._test.test_methodical -*-
 
-from functools import wraps
+from functools import wraps, reduce
 from itertools import count
 from inspect import getargspec
 
-from characteristic import attributes
+from characteristic import attributes, Attribute
 
 from ._core import Transitioner, Automaton
 from ._introspection import preserveName
@@ -32,7 +32,7 @@ class MethodicalState(object):
     A state for a L{MethodicalMachine}.
     """
 
-    def upon(self, input, enter, outputs):
+    def upon(self, input, enter, outputs, collecter=list):
         """
         Declare a state transition within the L{MethodicalMachine} associated
         with this L{MethodicalState}: upon the receipt of the input C{input},
@@ -51,11 +51,13 @@ class MethodicalState(object):
                         inputSignature=inputSpec,
                         outputSignature=outputSpec,
                 ))
-        self.machine._oneTransition(self, input, enter, outputs)
+        self.machine._oneTransition(self, input, enter, outputs, collecter)
 
 
 
-@attributes(['automaton', 'method', 'symbol'])
+@attributes(['automaton', 'method', 'symbol',
+             Attribute('collecters', default_factory=dict)],
+            apply_with_cmp=False)
 class MethodicalInput(object):
     """
     An input for a L{MethodicalMachine}.
@@ -80,8 +82,9 @@ class MethodicalInput(object):
         @wraps(self.method)
         def doInput(*args, **kwargs):
             self.method(oself, *args, **kwargs)
-            return [output(oself, *args, **kwargs)
-                    for output in transitioner.transition(self)]
+            collecter = self.collecters[transitioner._state]
+            return collecter(output(oself, *args, **kwargs)
+                             for output in transitioner.transition(self))
         return doInput
 
 
@@ -130,6 +133,7 @@ class MethodicalMachine(object):
 
     def __init__(self):
         self._automaton = Automaton()
+        self._reducers = {}
         self._symbol = gensym()
 
 
@@ -191,7 +195,8 @@ class MethodicalMachine(object):
         return decorator
 
 
-    def _oneTransition(self, startState, inputToken, endState, outputTokens):
+    def _oneTransition(self, startState, inputToken, endState, outputTokens,
+                       collecter):
         """
         See L{MethodicalState.upon}.
         """
@@ -211,6 +216,7 @@ class MethodicalMachine(object):
         #                                   .format(endState))
         self._automaton.addTransition(startState, inputToken, endState,
                                       tuple(outputTokens))
+        inputToken.collecters[startState] = collecter
 
 
     def graphviz(self):

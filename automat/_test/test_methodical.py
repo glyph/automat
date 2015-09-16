@@ -142,6 +142,36 @@ class MethodicalTests(TestCase):
         self.assertEqual(mm.inputB(), ["B"])
 
 
+    def test_collectOutputs(self):
+        """
+        Outputs can be combined with the "collecter" argument to "upon".
+        """
+        import operator
+        class Machine(object):
+            m = MethodicalMachine()
+            @m.input()
+            def input(self):
+                pass
+            @m.output()
+            def outputA(self):
+                return "A"
+            @m.output()
+            def outputB(self):
+                return "B"
+            @m.state(initial=True)
+            def state(self):
+                pass
+            state.upon(input, state, [outputA, outputB],
+                       collecter=lambda x: reduce(operator.add, x))
+        m = Machine()
+        self.assertEqual(m.input(), "AB")
+
+
+
+
+
+
+
     def test_methodName(self):
         """
         Input methods preserve their declared names.
