@@ -132,8 +132,7 @@ decorated with `machine.state`:
     # When we have beans, upon pressing the brew button, we will then not have
     # beans any more (as they have been entered into the brewing chamber) and
     # our output will be heating the heating element.
-
-    have_beans.upon(put_in_beans, enter=dont_have_beans,
+    have_beans.upon(brew_button, enter=dont_have_beans,
                     outputs=[_heat_the_heating_element])
 ```
 
