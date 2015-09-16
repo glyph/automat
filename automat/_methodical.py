@@ -32,7 +32,7 @@ class MethodicalState(object):
     A state for a L{MethodicalMachine}.
     """
 
-    def upon(self, input, enter, outputs, collecter=list):
+    def upon(self, input, enter, outputs, collector=list):
         """
         Declare a state transition within the L{MethodicalMachine} associated
         with this L{MethodicalState}: upon the receipt of the input C{input},
@@ -51,12 +51,12 @@ class MethodicalState(object):
                         inputSignature=inputSpec,
                         outputSignature=outputSpec,
                 ))
-        self.machine._oneTransition(self, input, enter, outputs, collecter)
+        self.machine._oneTransition(self, input, enter, outputs, collector)
 
 
 
 @attributes(['automaton', 'method', 'symbol',
-             Attribute('collecters', default_factory=dict)],
+             Attribute('collectors', default_factory=dict)],
             apply_with_cmp=False)
 class MethodicalInput(object):
     """
@@ -82,8 +82,8 @@ class MethodicalInput(object):
         @wraps(self.method)
         def doInput(*args, **kwargs):
             self.method(oself, *args, **kwargs)
-            collecter = self.collecters[transitioner._state]
-            return collecter(output(oself, *args, **kwargs)
+            collector = self.collectors[transitioner._state]
+            return collector(output(oself, *args, **kwargs)
                              for output in transitioner.transition(self))
         return doInput
 
@@ -196,7 +196,7 @@ class MethodicalMachine(object):
 
 
     def _oneTransition(self, startState, inputToken, endState, outputTokens,
-                       collecter):
+                       collector):
         """
         See L{MethodicalState.upon}.
         """
@@ -216,7 +216,7 @@ class MethodicalMachine(object):
         #                                   .format(endState))
         self._automaton.addTransition(startState, inputToken, endState,
                                       tuple(outputTokens))
-        inputToken.collecters[startState] = collecter
+        inputToken.collectors[startState] = collector
 
 
     def graphviz(self):

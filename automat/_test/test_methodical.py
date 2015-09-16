@@ -145,7 +145,7 @@ class MethodicalTests(TestCase):
 
     def test_collectOutputs(self):
         """
-        Outputs can be combined with the "collecter" argument to "upon".
+        Outputs can be combined with the "collector" argument to "upon".
         """
         import operator
         class Machine(object):
@@ -163,7 +163,7 @@ class MethodicalTests(TestCase):
             def state(self):
                 pass
             state.upon(input, state, [outputA, outputB],
-                       collecter=lambda x: reduce(operator.add, x))
+                       collector=lambda x: reduce(operator.add, x))
         m = Machine()
         self.assertEqual(m.input(), "AB")
 
