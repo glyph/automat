@@ -152,12 +152,31 @@ outputs specified to `upon` and all of the states are simply opaque tokens -
 although the fact that they're defined as methods like inputs and outputs
 allows you to put docstrings on them easily to document them.
 
+## Input for Inputs and Output for Outputs
+
+Quite often you want to be able to pass parameters to your methods, as well as
+inspecting their results.  For example, when you brew the coffee, you might
+expect a cup of coffee to result, and you would like to see what kind of coffee
+it is.  And if you were to put delicious hand-roasted small-batch artisanal
+beans into the machine, you would expect a *better* cup of coffee than if you
+were to use mass-produced beans.  You would do this in plain old Python by
+adding a parameter, so that's how you do it in Automat as well.
+
+```python
+    @_machine.input()
+    def put_in_beans(self, beans):
+        "The user put in some beans."
+```
+
+However, one important difference here is that we can't add any implememntation
+code to the input method; the change in the state of the coffee machine must be
+represented as an output.
+
 More comprehensive (tested, working) examples are present in `docs/examples`.
 
 ### What is the status of Automat? ###
 
-It is currently a rough prototype, but it may quickly come to be relied upon by
-some intensely real software, so stay tuned for more developments soon.
-
+The main missing component of Automat at this point is a mechanism to serialize
+the current state.
 
 
