@@ -140,9 +140,9 @@ To *users* of this coffee machine class though, it still looks like a POPO
 (Plain Old Python Object):
 
 ```python
->>> coffeeMachine = CoffeeMachine()
->>> coffeeMachine.put_in_beans()
->>> coffeeMachine.brew_button()
+>>> coffee_machine = CoffeeMachine()
+>>> coffee_machine.put_in_beans()
+>>> coffee_machine.brew_button()
 ```
 
 All of the *inputs* are provided by calling them like methods, all of the
