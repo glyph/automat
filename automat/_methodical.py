@@ -1,6 +1,6 @@
 # -*- test-case-name: automat._test.test_methodical -*-
 
-from functools import wraps, reduce
+from functools import wraps
 from itertools import count
 from inspect import getargspec
 

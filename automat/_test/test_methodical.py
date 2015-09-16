@@ -3,6 +3,7 @@
 Tests for the public interface of Automat.
 """
 
+from functools import reduce
 from unittest import TestCase
 
 from .. import MethodicalMachine
