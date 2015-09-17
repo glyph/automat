@@ -237,7 +237,10 @@ class MethodicalTests(TestCase):
 
     def test_saveState(self):
         """
-        L{MethodicalMachine.serializer}
+        L{MethodicalMachine.serializer} is a decorator that modifies its
+        decoratee's signature to take a "state" object as its first argument,
+        which is the "serialized" argument to the L{MethodicalMachine.state}
+        decorator.
         """
 
         class Mechanism(object):
