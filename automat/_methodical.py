@@ -54,6 +54,21 @@ class MethodicalState(object):
         self.machine._oneTransition(self, input, enter, outputs, collector)
 
 
+def _transitionerFromInstance(oself, symbol, automaton):
+    """
+    Get a L{Transitioner}
+    """
+    transitioner = getattr(oself, symbol, None)
+    if transitioner is None:
+        transitioner = Transitioner(
+            automaton,
+            # FIXME: public API on Automaton for getting the initial state.
+            list(automaton._initialStates)[0],
+        )
+        setattr(oself, symbol, transitioner)
+    return transitioner
+
+
 
 @attributes(['automaton', 'method', 'symbol',
              Attribute('collectors', default_factory=dict)],
