@@ -26,7 +26,7 @@ def _keywords_only(f):
 
 
 
-@attributes(['machine', 'method'])
+@attributes(['machine', 'method', 'serialized'])
 class MethodicalState(object):
     """
     A state for a L{MethodicalMachine}.
@@ -54,6 +54,21 @@ class MethodicalState(object):
         self.machine._oneTransition(self, input, enter, outputs, collector)
 
 
+def _transitionerFromInstance(oself, symbol, automaton):
+    """
+    Get a L{Transitioner}
+    """
+    transitioner = getattr(oself, symbol, None)
+    if transitioner is None:
+        transitioner = Transitioner(
+            automaton,
+            # FIXME: public API on Automaton for getting the initial state.
+            list(automaton._initialStates)[0],
+        )
+        setattr(oself, symbol, transitioner)
+    return transitioner
+
+
 
 @attributes(['automaton', 'method', 'symbol',
              Attribute('collectors', default_factory=dict)],
@@ -69,15 +84,8 @@ class MethodicalInput(object):
         by output functions produced by the given L{MethodicalInput} in
         C{oself}'s current state.
         """
-        # FIXME: multiple machines on one instance will stomp on each other.
-        transitioner = getattr(oself, self.symbol, None)
-        if transitioner is None:
-            transitioner = Transitioner(
-                self.automaton,
-                # FIXME: public API on Automaton for getting the initial state.
-                list(self.automaton._initialStates)[0],
-            )
-            setattr(oself, self.symbol, transitioner)
+        transitioner = _transitionerFromInstance(oself, self.symbol,
+                                                 self.automaton)
         @preserveName(self.method)
         @wraps(self.method)
         def doInput(*args, **kwargs):
@@ -150,16 +158,33 @@ class MethodicalMachine(object):
 
 
     @_keywords_only
-    def state(self, initial=False, terminal=False):
+    def state(self, initial=False, terminal=False,
+              serialized=None):
         """
         Declare a state, possibly an initial state or a terminal state.
 
         This is a decorator for methods, but it will modify the method so as
         not to be callable any more.
+
+        @param initial: is this state the initial state?  Only one state on
+            this L{MethodicalMachine} may be an initial state; more than one is
+            an error.
+        @type initial: L{bool}
+
+        @param terminal: Is this state a terminal state, i.e. a state that the
+            machine can end up in?  (This is purely informational at this
+            point.)
+        @type terminal: L{bool}
+
+        @param serialized: a serializable value to be used to represent this
+            state to external systems.  This value should be hashable;
+            L{unicode} is a good type to use.
+        @type serialized: a hashable (comparable) value
         """
         def decorator(stateMethod):
             state = MethodicalState(machine=self,
-                                    method=stateMethod)
+                                    method=stateMethod,
+                                    serialized=serialized)
             if initial:
                 self._automaton.addInitialState(state)
             return state
@@ -217,6 +242,40 @@ class MethodicalMachine(object):
         self._automaton.addTransition(startState, inputToken, endState,
                                       tuple(outputTokens))
         inputToken.collectors[startState] = collector
+
+
+    @_keywords_only
+    def serializer(self):
+        """
+        
+        """
+        def decorator(decoratee):
+            @wraps(decoratee)
+            def serialize(oself):
+                transitioner = _transitionerFromInstance(oself, self._symbol,
+                                                         self._automaton)
+                return decoratee(oself, transitioner._state.serialized)
+            return serialize
+        return decorator
+
+    @_keywords_only
+    def unserializer(self):
+        """
+        
+        """
+        def decorator(decoratee):
+            @wraps(decoratee)
+            def unserialize(oself, *args, **kwargs):
+                state = decoratee(oself, *args, **kwargs)
+                mapping = {}
+                for eachState in self._automaton.states():
+                    mapping[eachState.serialized] = eachState
+                transitioner = _transitionerFromInstance(
+                    oself, self._symbol, self._automaton)
+                transitioner._state = mapping[state]
+                return None # it's on purpose
+            return unserialize
+        return decorator
 
 
     def graphviz(self):
