@@ -244,6 +244,40 @@ class MethodicalMachine(object):
         inputToken.collectors[startState] = collector
 
 
+    @_keywords_only
+    def serializer(self):
+        """
+        
+        """
+        def decorator(decoratee):
+            @wraps(decoratee)
+            def serialize(oself):
+                transitioner = _transitionerFromInstance(oself, self._symbol,
+                                                         self._automaton)
+                return decoratee(oself, transitioner._state.serialized)
+            return serialize
+        return decorator
+
+    @_keywords_only
+    def unserializer(self):
+        """
+        
+        """
+        def decorator(decoratee):
+            @wraps(decoratee)
+            def unserialize(oself, *args, **kwargs):
+                state = decoratee(oself, *args, **kwargs)
+                mapping = {}
+                for eachState in self._automaton.states():
+                    mapping[eachState.serialized] = eachState
+                transitioner = _transitionerFromInstance(
+                    oself, self._symbol, self._automaton)
+                transitioner._state = mapping[state]
+                return None # it's on purpose
+            return unserialize
+        return decorator
+
+
     def graphviz(self):
         """
         Visualize this state machine using graphviz.
