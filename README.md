@@ -303,6 +303,119 @@ And now, we'll get just the return value we want:
 'A cup of coffee made with real good beans.'
 ```
 
+## If I can't get the state of the state machine, how can I save it to (a database, an API response, a file on disk...)
+
+There are APIs for serializing the state machine.
+
+First, you have to decide on a persistent representation of each state, via the
+`serialized=` argument to the `MethodicalMachine.state()` decorator.
+
+Let's take this very simple "light switch" state machine, which can be on or
+off, and flipped to reverse its state:
+
+```python
+class LightSwitch(object):
+    machine = MethodicalMachine()
+    @machine.state(serialized="on")
+    def on_state(self):
+        "the switch is on"
+    @machine.state(serialized="off", initial=True)
+    def off_state(self):
+        "the switch is off"
+    @machine.input()
+    def flip(self):
+        "flip the switch"
+    on_state.upon(flip, enter=off_state, outputs=[])
+    off_state.upon(flip, enter=on_state, outputs=[])
+```
+
+In this case, we've chosen a serialized representation for each state via the
+`serialized` argument.  The on state is represented by the string `"on"`, and
+the off state is represented by the string `"off"`.
+
+Now, let's just add an input that lets us tell if the switch is on or not.
+
+```python
+    @machine.input()
+    def query_power(self):
+        "return True if powered, False otherwise"
+    @machine.output()
+    def _is_powered(self):
+        return True
+    @machine.output()
+    def _not_powered(self):
+        return False
+    on_state.upon(query_power, enter=on_state, outputs=[_is_powered],
+                  collector=next)
+    off_state.upon(query_power, enter=off_state, outputs=[_not_powered],
+                   collector=next)
+```
+
+To save the state, we have the `MethodicalMachine.serializer()` method.  A
+method decorated with `@serializer()` gets an extra argument injected at the
+beginning of its argument list: the serialized identifier for the state.  In
+this case, either `"on"` or `"off"`.  Since state machine output methods can
+also affect other state on the object, a serializer method is expected to
+return *all* relevant state for serialization.
+
+For our simple light switch, such a method might look like this:
+
+```python
+    @machine.serializer()
+    def save(self, state):
+        return {"is-it-on": state}
+```
+
+Serializers can be public methods, and they can return whatever you like.  If
+necessary, you can havedifferent serializers - just multiple methods decorated
+with `@machine.serializer()` - for different formats; return one data-structure
+for JSON, one for XML, one for a database row, and so on.
+
+When it comes time to unserialize, though, you generally want a private method,
+because an unserializer has to take a not-fully-initialized instance and
+populate it with state.  It is expected to *return* the serialized machine
+state token that was passed to the serializer, but it can take whatever
+arguments you like.  Of course, in order to return that, it probably has to
+take it somewhere in its arguments, so it will generally take whatever a paired
+serializer has returned as an argument.
+
+So our unserializer would look like this:
+
+```python
+    @machine.unserializer()
+    def _restore(self, blob):
+        return blob["is-it-on"]
+```
+
+Generally you will want a classmethod deserialization constructor which you
+write yourself to call this, so that you know how to create an instance of your
+own object, like so:
+
+```python
+    @classmethod
+    def from_blob(cls, blob):
+        self = cls()
+        self._restore(blob)
+        return self
+```
+
+Saving and loading our `LightSwitch` along with its state-machine state can now
+be accomplished as follows:
+
+```python
+>>> switch1 = LightSwitch()
+>>> switch1.query_power()
+False
+>>> switch1.flip()
+[]
+>>> switch1.query_power()
+True
+>>> blob = switch1.save()
+>>> switch2 = LightSwitch.from_blob(blob)
+>>> switch2.query_power()
+True
+```
+
 More comprehensive (tested, working) examples are present in `docs/examples`.
 
 Go forth and machine all the state!
