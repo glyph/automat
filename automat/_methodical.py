@@ -84,15 +84,8 @@ class MethodicalInput(object):
         by output functions produced by the given L{MethodicalInput} in
         C{oself}'s current state.
         """
-        # FIXME: multiple machines on one instance will stomp on each other.
-        transitioner = getattr(oself, self.symbol, None)
-        if transitioner is None:
-            transitioner = Transitioner(
-                self.automaton,
-                # FIXME: public API on Automaton for getting the initial state.
-                list(self.automaton._initialStates)[0],
-            )
-            setattr(oself, self.symbol, transitioner)
+        transitioner = _transitionerFromInstance(oself, self.symbol,
+                                                 self.automaton)
         @preserveName(self.method)
         @wraps(self.method)
         def doInput(*args, **kwargs):
