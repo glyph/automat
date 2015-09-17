@@ -168,11 +168,6 @@ class MethodicalTests(TestCase):
         self.assertEqual(m.input(), "AB")
 
 
-
-
-
-
-
     def test_methodName(self):
         """
         Input methods preserve their declared names.
@@ -238,6 +233,41 @@ class MethodicalTests(TestCase):
                                                 outputThatDoesntMatch])
             self.assertIn("nameOfInput", str(cm.exception))
             self.assertIn("outputThatDoesntMatch", str(cm.exception))
+
+
+    def test_saveState(self):
+        """
+        L{MethodicalMachine.serializer}
+        """
+
+        class Mechanism(object):
+            m = MethodicalMachine()
+            def __init__(self):
+                self.value = 1
+            @m.state(serialized="first-state", initial=True)
+            def first(self):
+                "First state."
+            @m.state(serialized="second-state")
+            def second(self):
+                "Second state."
+            @m.serializer
+            def save(self, state):
+                return {
+                    'machine-state': state,
+                    'some-value': self.value,
+                }
+            @m.unserializer
+            def load(self, blob):
+                self.value = blob['some-value']
+                return blob['machine-state']
+
+        self.assertEqual(
+            Mechanism().save(),
+            {
+                "machine-state": "first-state",
+                "some-value": 1,
+            }
+        )
 
 
 # FIXME: error for more than one initial state
