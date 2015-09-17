@@ -268,6 +268,59 @@ class MethodicalTests(TestCase):
             }
         )
 
+    def test_restoreState(self):
+        """
+        
+        """
+
+        class Mechanism(object):
+            m = MethodicalMachine()
+            def __init__(self):
+                self.value = 1
+            @m.state(serialized="first-state", initial=True)
+            def first(self):
+                "First state."
+            @m.state(serialized="second-state")
+            def second(self):
+                "Second state."
+            @m.input()
+            def input(self):
+                pass
+            @m.output()
+            def output(self):
+                self.value = 2
+            first.upon(input, second, [output])
+            @m.serializer()
+            def save(self, state):
+                return {
+                    'machine-state': state,
+                    'some-value': self.value,
+                }
+
+            @m.unserializer()
+            def _restore(self, blob):
+                self.value = blob['some-value']
+                return blob['machine-state']
+
+            @classmethod
+            def fromBlob(cls, blob):
+                self = cls()
+                self._restore(blob)
+                return self
+
+        m1 = Mechanism()
+        m1.input()
+        blob = m1.save()
+        m2 = Mechanism.fromBlob(blob)
+        self.assertEqual(
+            m2.save(),
+            {
+                'machine-state': 'second-state',
+                'some-value': 2,
+            }
+        )
+
+
 
 # FIXME: error for more than one initial state
 # FIXME: error for wrong types on any call to _oneTransition
