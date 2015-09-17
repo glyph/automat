@@ -26,7 +26,7 @@ def _keywords_only(f):
 
 
 
-@attributes(['machine', 'method'])
+@attributes(['machine', 'method', 'serialized'])
 class MethodicalState(object):
     """
     A state for a L{MethodicalMachine}.
@@ -158,7 +158,8 @@ class MethodicalMachine(object):
 
 
     @_keywords_only
-    def state(self, initial=False, terminal=False):
+    def state(self, initial=False, terminal=False,
+              serialized=None):
         """
         Declare a state, possibly an initial state or a terminal state.
 
@@ -174,10 +175,16 @@ class MethodicalMachine(object):
             machine can end up in?  (This is purely informational at this
             point.)
         @type terminal: L{bool}
+
+        @param serialized: a serializable value to be used to represent this
+            state to external systems.  This value should be hashable;
+            L{unicode} is a good type to use.
+        @type serialized: a hashable (comparable) value
         """
         def decorator(stateMethod):
             state = MethodicalState(machine=self,
-                                    method=stateMethod)
+                                    method=stateMethod,
+                                    serialized=serialized)
             if initial:
                 self._automaton.addInitialState(state)
             return state
