@@ -164,6 +164,16 @@ class MethodicalMachine(object):
 
         This is a decorator for methods, but it will modify the method so as
         not to be callable any more.
+
+        @param initial: is this state the initial state?  Only one state on
+            this L{MethodicalMachine} may be an initial state; more than one is
+            an error.
+        @type initial: L{bool}
+
+        @param terminal: Is this state a terminal state, i.e. a state that the
+            machine can end up in?  (This is purely informational at this
+            point.)
+        @type terminal: L{bool}
         """
         def decorator(stateMethod):
             state = MethodicalState(machine=self,
