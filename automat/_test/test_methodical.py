@@ -253,16 +253,12 @@ class MethodicalTests(TestCase):
             @m.state(serialized="second-state")
             def second(self):
                 "Second state."
-            @m.serializer
+            @m.serializer()
             def save(self, state):
                 return {
                     'machine-state': state,
                     'some-value': self.value,
                 }
-            @m.unserializer
-            def load(self, blob):
-                self.value = blob['some-value']
-                return blob['machine-state']
 
         self.assertEqual(
             Mechanism().save(),
