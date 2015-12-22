@@ -6,7 +6,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='Automat',
-    version='0.2.0',
+    version='0.3.0',
     description="""
     Self-service finite-state machines for the programmer on the go.
     """,
