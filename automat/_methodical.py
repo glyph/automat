@@ -62,8 +62,7 @@ def _transitionerFromInstance(oself, symbol, automaton):
     if transitioner is None:
         transitioner = Transitioner(
             automaton,
-            # FIXME: public API on Automaton for getting the initial state.
-            list(automaton._initialStates)[0],
+            automaton.initialState,
         )
         setattr(oself, symbol, transitioner)
     return transitioner
@@ -186,7 +185,7 @@ class MethodicalMachine(object):
                                     method=stateMethod,
                                     serialized=serialized)
             if initial:
-                self._automaton.addInitialState(state)
+                self._automaton.initialState = state
             return state
         return decorator
 
@@ -247,7 +246,7 @@ class MethodicalMachine(object):
     @_keywords_only
     def serializer(self):
         """
-        
+
         """
         def decorator(decoratee):
             @wraps(decoratee)
@@ -261,7 +260,7 @@ class MethodicalMachine(object):
     @_keywords_only
     def unserializer(self):
         """
-        
+
         """
         def decorator(decoratee):
             @wraps(decoratee)

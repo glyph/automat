@@ -50,5 +50,18 @@ class CoreTests(TestCase):
         self.assertFalse(a.states())
         self.assertFalse(a.allTransitions())
 
+
+    def test_initialState(self):
+        """
+        L{Automaton.initialState} is a descriptor that sets the initial
+        state if it's not yet set, and raises L{ValueError} if it is.
+
+        """
+        a = Automaton()
+        a.initialState = "a state"
+        self.assertEqual(a.initialState, "a state")
+        with self.assertRaises(ValueError):
+            a.initialState = "another state"
+
+
 # FIXME: addTransition for transition that's been added before
-# FIXME: public API for determining initial states

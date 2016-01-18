@@ -235,6 +235,24 @@ class MethodicalTests(TestCase):
             self.assertIn("outputThatDoesntMatch", str(cm.exception))
 
 
+    def test_multipleInitialStatesFailure(self):
+        """
+        A L{MethodicalMachine} can only have one initial state.
+        """
+
+        class WillFail(object):
+            m = MethodicalMachine()
+
+            @m.state(initial=True)
+            def firstInitialState(self):
+                "The first initial state -- this is OK."
+
+            with self.assertRaises(ValueError):
+                @m.state(initial=True)
+                def secondInitialState(self):
+                    "The second initial state -- results in a ValueError."
+
+
     def test_saveState(self):
         """
         L{MethodicalMachine.serializer} is a decorator that modifies its
@@ -336,7 +354,6 @@ class MethodicalTests(TestCase):
 
 
 
-# FIXME: error for more than one initial state
 # FIXME: error for wrong types on any call to _oneTransition
 # FIXME: better public API for .upon; maybe a context manager?
 # FIXME: when transitions are defined, validate that we can always get to
