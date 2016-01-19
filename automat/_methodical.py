@@ -4,7 +4,7 @@ from functools import wraps
 from itertools import count
 from inspect import getargspec
 
-from characteristic import attributes, Attribute
+from characteristic import with_repr, attributes, Attribute
 
 from ._core import Transitioner, Automaton
 from ._introspection import preserveName
@@ -25,7 +25,7 @@ def _keywords_only(f):
     return g
 
 
-
+@with_repr(['method'])
 @attributes(['machine', 'method', 'serialized'])
 class MethodicalState(object):
     """
@@ -69,7 +69,7 @@ def _transitionerFromInstance(oself, symbol, automaton):
     return transitioner
 
 
-
+@with_repr(['method'])
 @attributes(['automaton', 'method', 'symbol',
              Attribute('collectors', default_factory=dict)],
             apply_with_cmp=False)
@@ -90,13 +90,15 @@ class MethodicalInput(object):
         @wraps(self.method)
         def doInput(*args, **kwargs):
             self.method(oself, *args, **kwargs)
-            collector = self.collectors[transitioner._state]
+            previousState = transitioner._state
+            outputs = transitioner.transition(self)
+            collector = self.collectors[previousState]
             return collector(output(oself, *args, **kwargs)
-                             for output in transitioner.transition(self))
+                             for output in outputs)
         return doInput
 
 
-
+@with_repr(['method'])
 @attributes(['machine', 'method'])
 class MethodicalOutput(object):
     """
@@ -247,7 +249,7 @@ class MethodicalMachine(object):
     @_keywords_only
     def serializer(self):
         """
-        
+
         """
         def decorator(decoratee):
             @wraps(decoratee)
@@ -261,7 +263,7 @@ class MethodicalMachine(object):
     @_keywords_only
     def unserializer(self):
         """
-        
+
         """
         def decorator(decoratee):
             @wraps(decoratee)
