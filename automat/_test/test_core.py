@@ -1,5 +1,5 @@
 
-from .._core import Automaton
+from .._core import Automaton, NoTransition
 
 from unittest import TestCase
 
@@ -8,13 +8,32 @@ class CoreTests(TestCase):
     Tests for Automat's (currently private, implementation detail) core.
     """
 
+    def test_NoTransition(self):
+        """
+        A L{NoTransition} exception describes the state and input symbol
+        that caused it.
+        """
+        # NoTransition requires two arguments
+        with self.assertRaises(TypeError):
+            NoTransition()
+
+        state = "current-state"
+        symbol = "transitionless-symbol"
+        noTransitionException = NoTransition(state=state, symbol=symbol)
+
+        self.assertIs(noTransitionException.symbol, symbol)
+
+        self.assertIn(state, str(noTransitionException))
+        self.assertIn(symbol, str(noTransitionException))
+
+
     def test_noOutputForInput(self):
         """
-        L{Automaton.outputForInput} raises L{NotImplementedError} if no
+        L{Automaton.outputForInput} raises L{NoTransition} if no
         transition for that input is defined.
         """
         a = Automaton()
-        self.assertRaises(NotImplementedError, a.outputForInput,
+        self.assertRaises(NoTransition, a.outputForInput,
                           "no-state", "no-symbol")
 
 

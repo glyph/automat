@@ -11,6 +11,24 @@ from itertools import chain
 _NO_STATE = "<no state>"
 
 
+class NoTransition(Exception):
+    """
+    A finite state machine in C{state} has no transition for C{symbol}.
+
+    @param state: the finite state machine's state at the time of the
+        illegal transition.
+
+    @param symbol: the input symbol for which no transition exists.
+    """
+
+    def __init__(self, state, symbol):
+        self.state = state
+        self.symbol = symbol
+        super(Exception, self).__init__(
+            "no transition for {} in {}".format(symbol, state)
+        )
+
+
 class Automaton(object):
     """
     A declaration of a finite state machine.
@@ -108,9 +126,7 @@ class Automaton(object):
              outState, outputSymbols) in self._transitions:
             if (inState, inputSymbol) == (anInState, anInputSymbol):
                 return (outState, list(outputSymbols))
-        raise NotImplementedError("no transition for {} in {}"
-                                  .format(inputSymbol, inState))
-
+        raise NoTransition(state=inState, symbol=inputSymbol)
 
 
 class Transitioner(object):

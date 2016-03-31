@@ -6,7 +6,7 @@ Tests for the public interface of Automat.
 from functools import reduce
 from unittest import TestCase
 
-from .. import MethodicalMachine
+from .. import MethodicalMachine, NoTransition
 
 class MethodicalTests(TestCase):
     """
@@ -256,7 +256,7 @@ class MethodicalTests(TestCase):
     def test_badTransitionForCurrentState(self):
         """
         Calling any input method that lacks a transition for the machine's
-        current state raises an informative C{NotImplementedError}.
+        current state raises an informative C{NoTransition}.
         """
 
         class OnlyOnePath(object):
@@ -276,12 +276,12 @@ class MethodicalTests(TestCase):
             start.upon(advance, end, [])
 
         machine = OnlyOnePath()
-        with self.assertRaises(NotImplementedError) as cm:
+        with self.assertRaises(NoTransition) as cm:
             machine.deadEnd()
         self.assertIn("deadEnd", str(cm.exception))
         self.assertIn("start", str(cm.exception))
         machine.advance()
-        with self.assertRaises(NotImplementedError) as cm:
+        with self.assertRaises(NoTransition) as cm:
             machine.deadEnd()
         self.assertIn("deadEnd", str(cm.exception))
         self.assertIn("end", str(cm.exception))
