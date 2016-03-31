@@ -8,6 +8,8 @@ Perhaps something that could be replaced with or integrated into machinist.
 
 from itertools import chain
 
+_NO_STATE = "<no state>"
+
 
 class Automaton(object):
     """
@@ -18,10 +20,32 @@ class Automaton(object):
 
     def __init__(self):
         """
-        Initialize the set of transitions and final states.
+        Initialize the set of transitions and the initial state.
         """
-        self._initialStates = set()
+        self._initialState = _NO_STATE
         self._transitions = set()
+
+
+    @property
+    def initialState(self):
+        """
+        Return this automaton's initial state.
+        """
+        return self._initialState
+
+
+    @initialState.setter
+    def initialState(self, state):
+        """
+        Set this automaton's initial state.  Raises a ValueError if
+        this automaton already has an initial state.
+        """
+
+        if self._initialState is not _NO_STATE:
+            raise ValueError(
+                "initial state already set to {}".format(self._initialState))
+
+        self._initialState = state
 
 
     def addTransition(self, inState, inputSymbol, outState, outputSymbols):
@@ -38,13 +62,6 @@ class Automaton(object):
         All transitions.
         """
         return frozenset(self._transitions)
-
-
-    def addInitialState(self, state):
-        """
-        Add the given atom to the set of initial states.
-        """
-        self._initialStates.add(state)
 
 
     def inputAlphabet(self):
@@ -83,13 +100,6 @@ class Automaton(object):
         )
 
 
-    def initialStates(self):
-        """
-        
-        """
-        return frozenset(self._initialStates)
-
-
     def outputForInput(self, inState, inputSymbol):
         """
         A 2-tuple of (outState, outputSymbols) for inputSymbol.
@@ -121,6 +131,3 @@ class Transitioner(object):
                                                                  inputSymbol)
         self._state = outState
         return outputSymbols
-
-
-

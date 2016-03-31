@@ -33,6 +33,35 @@ class CoreTests(TestCase):
                          ("ending", ["end"]))
         self.assertEqual(a.states(), set(["beginning", "ending"]))
 
+
+    def test_oneTransition_nonIterableOutputs(self):
+        """
+        L{Automaton.addTransition} raises a TypeError when given outputs
+        that aren't iterable and doesn't add any transitions.
+        """
+        a = Automaton()
+        nonIterableOutputs = 1
+        self.assertRaises(
+            TypeError,
+            a.addTransition,
+            "fromState", "viaSymbol", "toState", nonIterableOutputs)
+        self.assertFalse(a.inputAlphabet())
+        self.assertFalse(a.outputAlphabet())
+        self.assertFalse(a.states())
+        self.assertFalse(a.allTransitions())
+
+
+    def test_initialState(self):
+        """
+        L{Automaton.initialState} is a descriptor that sets the initial
+        state if it's not yet set, and raises L{ValueError} if it is.
+
+        """
+        a = Automaton()
+        a.initialState = "a state"
+        self.assertEqual(a.initialState, "a state")
+        with self.assertRaises(ValueError):
+            a.initialState = "another state"
+
+
 # FIXME: addTransition for transition that's been added before
-# FIXME: addTransition with a non-iterable for outputs
-# FIXME: public API for determining initial states

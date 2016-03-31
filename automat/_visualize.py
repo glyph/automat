@@ -27,7 +27,7 @@ def graphviz(automaton, inputAsString=repr,
     yield 'edge[fontname="Menlo"]\n'
 
     for state in automaton.states():
-        if state in automaton.initialStates():
+        if state is automaton.initialState:
             stateShape = "bold"
             fontName = "Menlo-Bold"
         else:
