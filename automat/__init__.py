@@ -1,9 +1,8 @@
 # -*- test-case-name: automat -*-
 from ._methodical import MethodicalMachine
-# from ._core import Transitioner, Automaton
+from ._core import NoTransition
 
 __all__ = [
     'MethodicalMachine',
-    # 'Transitioner',
-    # 'Automaton',
+    'NoTransition',
 ]
