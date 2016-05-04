@@ -367,7 +367,7 @@ For our simple light switch, such a method might look like this:
 ```
 
 Serializers can be public methods, and they can return whatever you like.  If
-necessary, you can havedifferent serializers - just multiple methods decorated
+necessary, you can have different serializers - just multiple methods decorated
 with `@machine.serializer()` - for different formats; return one data-structure
 for JSON, one for XML, one for a database row, and so on.
 
