@@ -7,10 +7,25 @@ from unittest import TestCase, skipIf
 
 from .._methodical import MethodicalMachine
 
+
+def isGraphvizModuleInstalled():
+    """
+    Is the graphviz Python module installed?
+    """
+    try:
+        import graphviz
+    except ImportError:
+        return False
+    else:
+        del graphviz
+        return True
+
+
 def isGraphvizInstalled():
     """
-    Is graphviz installed?
+    Are the graphviz tools installed?
     """
+
     r, w = os.pipe()
     os.close(w)
     try:
@@ -45,7 +60,8 @@ def sampleMachine():
 
 
 
-@skipIf(not isGraphvizInstalled(), "Graphviz is not installed.")
+@skipIf(not isGraphvizModuleInstalled(), "Graphviz module is not installed.")
+@skipIf(not isGraphvizInstalled(), "Graphviz tools are not installed.")
 class IntegrationTests(TestCase):
     """
     Tests which make sure Graphviz can understand the output produced by
@@ -58,11 +74,12 @@ class IntegrationTests(TestCase):
         """
         p = subprocess.Popen("dot", stdin=subprocess.PIPE,
                              stdout=subprocess.PIPE)
-        out, err = p.communicate("".join(sampleMachine().graphviz())
+        out, err = p.communicate("".join(sampleMachine().asDigraph())
                                  .encode("utf-8"))
         self.assertEqual(p.returncode, 0)
 
 
+@skipIf(not isGraphvizModuleInstalled(), "Graphviz module is not installed.")
 class SpotChecks(TestCase):
     """
     Tests to make sure that the output contains salient features of the machine
@@ -74,7 +91,7 @@ class SpotChecks(TestCase):
         The output of L{graphviz} should contain the names of the states,
         inputs, outputs in the state machine.
         """
-        gvout = "".join(sampleMachine().graphviz())
+        gvout = "".join(sampleMachine().asDigraph())
         self.assertIn("begin", gvout)
         self.assertIn("end", gvout)
         self.assertIn("go", gvout)

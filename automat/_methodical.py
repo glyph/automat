@@ -279,19 +279,20 @@ class MethodicalMachine(object):
         return decorator
 
 
-    def graphviz(self):
+    def asDigraph(self):
         """
-        Visualize this state machine using graphviz.
+        Generate a C{graphviz.Digraph} that represents this machine's
+        states and transitions.
 
-        @return: an iterable of lines of graphviz-format data suitable for
-            feeding to C{dot} or C{neato} which visualizes the state machine
-            described by this L{MethodicalMachine}.
+        @return: C{graphviz.Digraph} object; for me information, please
+            see the documentation for
+            U{graphviz<https://graphviz.readthedocs.io/>}
+
         """
-        from ._visualize import graphviz
-        for line in graphviz(
-                self._automaton,
-                stateAsString=lambda state: state.method.__name__,
-                inputAsString=lambda input: input.method.__name__,
-                outputAsString=lambda output: output.method.__name__,
-        ):
-            yield line
+        from ._visualize import makeDigraph
+        return makeDigraph(
+            self._automaton,
+            stateAsString=lambda state: state.method.__name__,
+            inputAsString=lambda input: input.method.__name__,
+            outputAsString=lambda output: output.method.__name__,
+        )
