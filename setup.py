@@ -17,7 +17,8 @@ setup(
         "six",
     ],
     extras_require={
-        'visualize': ['graphviz>=0.4.9']
+        'visualize': ['graphviz>=0.4.9',
+                      'Twisted>=16.1.1'],
     },
     include_package_data=True,
     license="MIT",
