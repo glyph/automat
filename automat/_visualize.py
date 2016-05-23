@@ -58,8 +58,7 @@ def makeDigraph(automaton, inputAsString=repr,
                 outputAsString=repr,
                 stateAsString=repr):
     """
-    Produce a C{graphviz.Digraph} object from an automaton.
-
+    Produce a L{graphviz.Digraph} object from an automaton.
     """
     digraph = graphviz.Digraph(graph_attr={'pack': 'true',
                                            'dpi': '100'},

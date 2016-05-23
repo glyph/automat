@@ -281,10 +281,10 @@ class MethodicalMachine(object):
 
     def asDigraph(self):
         """
-        Generate a C{graphviz.Digraph} that represents this machine's
+        Generate a L{graphviz.Digraph} that represents this machine's
         states and transitions.
 
-        @return: C{graphviz.Digraph} object; for me information, please
+        @return: L{graphviz.Digraph} object; for more information, please
             see the documentation for
             U{graphviz<https://graphviz.readthedocs.io/>}
 
