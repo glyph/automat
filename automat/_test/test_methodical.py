@@ -256,7 +256,7 @@ class MethodicalTests(TestCase):
     def test_badTransitionForCurrentState(self):
         """
         Calling any input method that lacks a transition for the machine's
-        current state raises an informative C{NoTransition}.
+        current state raises an informative L{NoTransition}.
         """
 
         class OnlyOnePath(object):
