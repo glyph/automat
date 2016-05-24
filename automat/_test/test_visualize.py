@@ -8,19 +8,16 @@ from characteristic import attributes
 
 from .._methodical import MethodicalMachine
 
-from .._visualize import elementMaker, tableMaker
-
 
 def isGraphvizModuleInstalled():
     """
     Is the graphviz Python module installed?
     """
     try:
-        import graphviz
+        __import__("graphviz")
     except ImportError:
         return False
     else:
-        del graphviz
         return True
 
 
@@ -62,10 +59,15 @@ def sampleMachine():
     return mm
 
 
+@skipIf(not isGraphvizModuleInstalled(), "Graphviz module is not installed.")
 class ElementMakerTests(TestCase):
     """
     Tests that ensure elementMaker generates correct HTML.
     """
+
+    def setUp(self):
+        from .._visualize import elementMaker
+        self.elementMaker = elementMaker
 
     def test_sortsAttrs(self):
         """
@@ -73,10 +75,10 @@ class ElementMakerTests(TestCase):
         """
         expected = r'<div a="1" b="2" c="3"></div>'
         self.assertEqual(expected,
-                         elementMaker("div",
-                                      b='2',
-                                      a='1',
-                                      c='3'))
+                         self.elementMaker("div",
+                                           b='2',
+                                           a='1',
+                                           c='3'))
 
     def test_quotesAttrs(self):
         """
@@ -84,17 +86,17 @@ class ElementMakerTests(TestCase):
         """
         expected = r'<div a="1" b="a \" quote" c="a string"></div>'
         self.assertEqual(expected,
-                         elementMaker("div",
-                                      b='a " quote',
-                                      a=1,
-                                      c="a string"))
+                         self.elementMaker("div",
+                                           b='a " quote',
+                                           a=1,
+                                           c="a string"))
 
     def test_noAttrs(self):
         """
         L{elementMaker} should render an element with no attributes.
         """
         expected = r'<div ></div>'
-        self.assertEqual(expected, elementMaker("div"))
+        self.assertEqual(expected, self.elementMaker("div"))
 
 
 @attributes(['name', 'children', 'attrs'])
@@ -124,6 +126,7 @@ def isLeaf(element):
     return not isinstance(element, HTMLElement)
 
 
+@skipIf(not isGraphvizModuleInstalled(), "Graphviz module is not installed.")
 class TableMakerTests(TestCase):
     """
     Tests that ensure tableMaker generates correctly structured tables.
@@ -133,6 +136,8 @@ class TableMakerTests(TestCase):
         return HTMLElement(name=name, children=children, attrs=attrs)
 
     def setUp(self):
+        from .._visualize import tableMaker
+
         self.inputLabel = "input label"
         self.port = "the port"
         self.tableMaker = functools.partial(tableMaker,
