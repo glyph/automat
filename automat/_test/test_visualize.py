@@ -62,7 +62,7 @@ def sampleMachine():
 @skipIf(not isGraphvizModuleInstalled(), "Graphviz module is not installed.")
 class ElementMakerTests(TestCase):
     """
-    Tests that ensure elementMaker generates correct HTML.
+    L{elementMaker} generates HTML representing the specified element.
     """
 
     def setUp(self):
@@ -82,7 +82,9 @@ class ElementMakerTests(TestCase):
 
     def test_quotesAttrs(self):
         """
-        L{elementMaker} quotes HTML attributes correctly.
+        L{elementMaker} quotes HTML attributes according to DOT's quoting rule.
+
+        See U{http://www.graphviz.org/doc/info/lang.html}, footnote 1.
         """
         expected = r'<div a="1" b="a \" quote" c="a string"></div>'
         self.assertEqual(expected,
@@ -129,7 +131,11 @@ def isLeaf(element):
 @skipIf(not isGraphvizModuleInstalled(), "Graphviz module is not installed.")
 class TableMakerTests(TestCase):
     """
-    Tests that ensure tableMaker generates correctly structured tables.
+    Tests that ensure L{tableMaker} generates HTML tables usable as
+    labels in DOT graphs.
+
+    For more information, read the "HTML-Like Labels" section of
+    U{http://www.graphviz.org/doc/info/shapes.html}.
     """
 
     def fakeElementMaker(self, name, *children, **attrs):
