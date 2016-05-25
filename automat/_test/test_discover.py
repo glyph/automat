@@ -20,7 +20,7 @@ def isTwistedInstalled():
 
 class _WritesPythonModules(TestCase):
     """
-    A helper that allows writing Python modules and packages as test fixtures.
+    A helper that enables generating Python module test fixtures.
     """
 
     def setUp(self):
@@ -179,7 +179,7 @@ class OriginalLocationTests(_WritesPythonModules):
 @skipIf(not isTwistedInstalled(), "Twisted is not installed.")
 class FindMachinesViaWrapperTests(_WritesPythonModules):
     """
-    L{findMachinesViaWrapper} should recursively yield FQPN,
+    L{findMachinesViaWrapper} recursively yields FQPN,
     L{MethodicalMachine} pairs in and under a given
     L{twisted.python.modules.PythonModule} or
     L{twisted.python.modules.PythonAttribute}.
@@ -213,7 +213,7 @@ class FindMachinesViaWrapperTests(_WritesPythonModules):
         """
         When given a L{twisted.python.modules.PythonAttribute} that refers
         directly to a L{MethodicalMachine}, L{findMachinesViaWrapper}
-        yields that machine with the correct FQPN.
+        yields that machine and its FQPN.
         """
         source = """\
         from automat import MethodicalMachine
@@ -229,9 +229,9 @@ class FindMachinesViaWrapperTests(_WritesPythonModules):
     def test_yieldsMachineInClass(self):
         """
         When given a L{twisted.python.modules.PythonAttribute} that refers
-        to a class that contains L{MethodicalMachine} as a class
-        variable, L{findMachinesViaWrapper} yields that machine with
-        the correct FQPN.
+        to a class that contains a L{MethodicalMachine} as a class
+        variable, L{findMachinesViaWrapper} yields that machine and
+        its FQPN.
         """
         source = """\
         from automat import MethodicalMachine
@@ -248,9 +248,9 @@ class FindMachinesViaWrapperTests(_WritesPythonModules):
     def test_yieldsMachineInNestedClass(self):
         """
         When given a L{twisted.python.modules.PythonAttribute} that refers
-        to a nested class that contains L{MethodicalMachine} as a class
-        variable, L{findMachinesViaWrapper} yields that machine with
-        the correct FQPN.
+        to a nested class that contains a L{MethodicalMachine} as a
+        class variable, L{findMachinesViaWrapper} yields that machine
+        and its FQPN.
         """
         source = """\
         from automat import MethodicalMachine
@@ -272,8 +272,7 @@ class FindMachinesViaWrapperTests(_WritesPythonModules):
         """
         When given a L{twisted.python.modules.PythonModule} that refers to
         a module that contains a L{MethodicalMachine},
-        L{findMachinesViaWrapper} yields that machine with the
-        correct FQPN.
+        L{findMachinesViaWrapper} yields that machine and its FQPN.
         """
         source = """\
         from automat import MethodicalMachine
@@ -290,7 +289,7 @@ class FindMachinesViaWrapperTests(_WritesPythonModules):
         When given a L{twisted.python.modules.PythonModule} that refers to
         the original module of a class containing a
         L{MethodicalMachine}, L{findMachinesViaWrapper} yields that
-        machine with the correct FQPN.
+        machine and its FQPN.
         """
         source = """\
         from automat import MethodicalMachine
@@ -310,7 +309,7 @@ class FindMachinesViaWrapperTests(_WritesPythonModules):
         When given a L{twisted.python.modules.PythonModule} that refers to
         the original module of a nested class containing a
         L{MethodicalMachine}, L{findMachinesViaWrapper} yields that
-        machine with the correct FQPN.
+        machine and its FQPN.
         """
         source = """\
         from automat import MethodicalMachine
@@ -329,7 +328,7 @@ class FindMachinesViaWrapperTests(_WritesPythonModules):
 
     def test_ignoresImportedClass(self):
         """
-        When given L{twisted.python.modules.PythonAttribute} that refers
+        When given a L{twisted.python.modules.PythonAttribute} that refers
         to a class imported from another module, any
         L{MethodicalMachine}s on that class are ignored.
 
@@ -396,7 +395,7 @@ class FindMachinesViaWrapperTests(_WritesPythonModules):
         """
         L{findMachinesViaWrapper} ignores infinite loops.
 
-        Note this test can't fail - it can only run forever...
+        Note this test can't fail - it can only run forever!
         """
         source = """
         class InfiniteLoop(object):
@@ -411,7 +410,7 @@ class FindMachinesViaWrapperTests(_WritesPythonModules):
 @skipIf(not isTwistedInstalled(), "Twisted is not installed.")
 class WrapFQPNTests(TestCase):
     """
-    Tests that ensure L{wrapFQPN} loads the correct
+    Tests that ensure L{wrapFQPN} loads the
     L{twisted.python.modules.PythonModule} or
     L{twisted.python.modules.PythonAttribute} for a given FQPN.
     """
@@ -429,9 +428,8 @@ class WrapFQPNTests(TestCase):
 
     def assertModuleWrapperRefersTo(self, moduleWrapper, module):
         """
-        Assert that a L{twisted.python.modules.PythonModule} refers to an
-        actual Python module.
-
+        Assert that a L{twisted.python.modules.PythonModule} refers to a
+        particular Python module.
         """
         self.assertIsInstance(moduleWrapper, self.PythonModule)
         self.assertEqual(moduleWrapper.name, module.__name__)
@@ -453,10 +451,10 @@ class WrapFQPNTests(TestCase):
         with self.assertRaises(self.InvalidFQPN):
             self.wrapFQPN('')
 
-    def test_failsWithIncorrectDotting(self):
+    def test_failsWithBadDotting(self):
         """"
-        L{wrapFQPN} raises L{InvalidFQPN} when given an
-        incorrectly-dotted FQPN
+        L{wrapFQPN} raises L{InvalidFQPN} when given a badly-dotted
+        FQPN.  (e.g., x..y).
         """
         for bad in ('.fails', 'fails.', 'this..fails'):
             with self.assertRaises(self.InvalidFQPN):
@@ -493,7 +491,7 @@ class WrapFQPNTests(TestCase):
     def test_multiplePackages(self):
         """
         L{wrapFQPN} returns a L{twisted.python.modules.PythonModule}
-        referring to the deepest module described by dotted FQPN.
+        referring to the deepest package described by dotted FQPN.
         """
         import xml.etree
         self.assertModuleWrapperRefersTo(self.wrapFQPN('xml.etree'), xml.etree)
@@ -510,7 +508,7 @@ class WrapFQPNTests(TestCase):
     def test_singleModuleObject(self):
         """
         L{wrapFQPN} returns a L{twisted.python.modules.PythonAttribute}
-        referring to the deepest object an FQPN with a depth of one module.
+        referring to the deepest object an FQPN names, traversing one module.
         """
         import os
         self.assertAttributeWrapperRefersTo(
@@ -519,8 +517,8 @@ class WrapFQPNTests(TestCase):
     def test_multiplePackagesObject(self):
         """
         L{wrapFQPN} returns a L{twisted.python.modules.PythonAttribute}
-        referring to the deepest object an FQPN that descends through
-        several packages.
+        referring to the deepest object described by an FQPN,
+        descending through several packages.
         """
         import xml.etree.ElementTree
         import automat
@@ -535,7 +533,7 @@ class WrapFQPNTests(TestCase):
     def test_failsWithMultiplePackagesMissingModuleOrPackage(self):
         """
         L{wrapFQPN} raises L{NoObject} when given an FQPN that contains a
-        missing attribute.
+        missing attribute, module, or package.
         """
         for bad in ('xml.etree.nope!',
                     'xml.etree.nope!.but.the.rest.is.believable'):
