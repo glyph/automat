@@ -16,6 +16,9 @@ setup(
         "characteristic",
         "six",
     ],
+    extras_require={
+        'visualize': ['graphviz>=0.4.9']
+    },
     include_package_data=True,
     license="MIT",
 )
