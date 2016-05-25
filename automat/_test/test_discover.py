@@ -8,14 +8,6 @@ from unittest import skipIf, TestCase
 
 import six
 
-from .._discover import (isOriginalLocation,
-                         findMachinesViaWrapper,
-                         wrapFQPN,
-                         InvalidFQPN,
-                         NoModule,
-                         NoObject,
-                         findMachines)
-
 
 def isTwistedInstalled():
     try:
@@ -99,6 +91,11 @@ class OriginalLocationTests(_WritesPythonModules):
     L{PythonAttribute} with a name of 'baz.bar' does.
 
     """
+    def setUp(self):
+        super(OriginalLocationTests, self).setUp()
+        from .._discover import isOriginalLocation
+        self.isOriginalLocation = isOriginalLocation
+
     def test_failsWithNoModule(self):
         """
         L{isOriginalLocation} returns False when the attribute refers to an
@@ -115,7 +112,7 @@ class OriginalLocationTests(_WritesPythonModules):
                                            self.pathDir,
                                            'empty_module_attr.py')
 
-        self.assertFalse(isOriginalLocation(
+        self.assertFalse(self.isOriginalLocation(
             moduleDict['empty_module_attr.hasEmptyModule']))
 
     def test_failsWithDifferentModule(self):
@@ -142,16 +139,18 @@ class OriginalLocationTests(_WritesPythonModules):
                                               self.pathDir,
                                               'importing.py')
         self.assertFalse(
-            isOriginalLocation(importingDict['importing.ImportThisClass']))
+            self.isOriginalLocation(
+                importingDict['importing.ImportThisClass']))
         self.assertFalse(
-            isOriginalLocation(importingDict['importing.importThisObject']))
+            self.isOriginalLocation(
+                importingDict['importing.importThisObject']))
 
         nestingObject = importingDict['importing.importThisNestingObject']
         nestingObjectDict = self.attributesAsDict(nestingObject)
         nestedObject = nestingObjectDict[
             'importing.importThisNestingObject.nestedObject']
 
-        self.assertFalse(isOriginalLocation(nestedObject))
+        self.assertFalse(self.isOriginalLocation(nestedObject))
 
     def test_succeedsWithSameModule(self):
         """
@@ -166,14 +165,15 @@ class OriginalLocationTests(_WritesPythonModules):
         aNestingObject.nestedObject = ThisClassWasDefinedHere()
         """)
         mDict = self.makeModuleAsDict(mSource, self.pathDir, 'm.py')
-        self.assertTrue(isOriginalLocation(mDict['m.ThisClassWasDefinedHere']))
-        self.assertTrue(isOriginalLocation(mDict['m.aNestingObject']))
+        self.assertTrue(self.isOriginalLocation(
+            mDict['m.ThisClassWasDefinedHere']))
+        self.assertTrue(self.isOriginalLocation(mDict['m.aNestingObject']))
 
         nestingObject = mDict['m.aNestingObject']
         nestingObjectDict = self.attributesAsDict(nestingObject)
         nestedObject = nestingObjectDict['m.aNestingObject.nestedObject']
 
-        self.assertTrue(isOriginalLocation(nestedObject))
+        self.assertTrue(self.isOriginalLocation(nestedObject))
 
 
 @skipIf(not isTwistedInstalled(), "Twisted is not installed.")
@@ -204,6 +204,11 @@ class FindMachinesViaWrapperTests(_WritesPythonModules):
     anotherIgnoredPythonObject = "I am ignored."
     """
 
+    def setUp(self):
+        super(FindMachinesViaWrapperTests, self).setUp()
+        from .._discover import findMachinesViaWrapper
+        self.findMachinesViaWrapper = findMachinesViaWrapper
+
     def test_yieldsMachine(self):
         """
         When given a L{twisted.python.modules.PythonAttribute} that refers
@@ -219,7 +224,7 @@ class FindMachinesViaWrapperTests(_WritesPythonModules):
         moduleDict = self.makeModuleAsDict(source, self.pathDir, 'root.py')
         rootMachine = moduleDict['root.rootMachine']
         self.assertIn(('root.rootMachine', rootMachine.load()),
-                      list(findMachinesViaWrapper(rootMachine)))
+                      list(self.findMachinesViaWrapper(rootMachine)))
 
     def test_yieldsMachineInClass(self):
         """
@@ -238,7 +243,7 @@ class FindMachinesViaWrapperTests(_WritesPythonModules):
         PythonClass = moduleDict['clsmod.PythonClass']
         self.assertIn(('clsmod.PythonClass._classMachine',
                        PythonClass.load()._classMachine),
-                      list(findMachinesViaWrapper(PythonClass)))
+                      list(self.findMachinesViaWrapper(PythonClass)))
 
     def test_yieldsMachineInNestedClass(self):
         """
@@ -261,7 +266,7 @@ class FindMachinesViaWrapperTests(_WritesPythonModules):
         PythonClass = moduleDict['nestedcls.PythonClass']
         self.assertIn(('nestedcls.PythonClass.NestedClass._classMachine',
                        PythonClass.load().NestedClass._classMachine),
-                      list(findMachinesViaWrapper(PythonClass)))
+                      list(self.findMachinesViaWrapper(PythonClass)))
 
     def test_yieldsMachineInModule(self):
         """
@@ -278,7 +283,7 @@ class FindMachinesViaWrapperTests(_WritesPythonModules):
         module = self.makeModule(source, self.pathDir, 'root.py')
         rootMachine = self.loadModuleAsDict(module)['root.rootMachine'].load()
         self.assertIn(('root.rootMachine', rootMachine),
-                      list(findMachinesViaWrapper(module)))
+                      list(self.findMachinesViaWrapper(module)))
 
     def test_yieldsMachineInClassInModule(self):
         """
@@ -298,7 +303,7 @@ class FindMachinesViaWrapperTests(_WritesPythonModules):
             module)['clsmod.PythonClass'].load()
         self.assertIn(('clsmod.PythonClass._classMachine',
                        PythonClass._classMachine),
-                      list(findMachinesViaWrapper(module)))
+                      list(self.findMachinesViaWrapper(module)))
 
     def test_yieldsMachineInNestedClassInModule(self):
         """
@@ -320,7 +325,7 @@ class FindMachinesViaWrapperTests(_WritesPythonModules):
 
         self.assertIn(('nestedcls.PythonClass.NestedClass._classMachine',
                        PythonClass.NestedClass._classMachine),
-                      list(findMachinesViaWrapper(module)))
+                      list(self.findMachinesViaWrapper(module)))
 
     def test_ignoresImportedClass(self):
         """
@@ -347,7 +352,7 @@ class FindMachinesViaWrapperTests(_WritesPythonModules):
                                           self.pathDir,
                                           'importing.py')
 
-        self.assertFalse(list(findMachinesViaWrapper(importingModule)))
+        self.assertFalse(list(self.findMachinesViaWrapper(importingModule)))
 
     def test_descendsIntoPackages(self):
         """
@@ -372,7 +377,7 @@ class FindMachinesViaWrapperTests(_WritesPythonModules):
         self.makeModule(source, package.path, 'module.py')
 
         test_package = pythonPath['test_package']
-        machines = sorted(findMachinesViaWrapper(test_package),
+        machines = sorted(self.findMachinesViaWrapper(test_package),
                           key=operator.itemgetter(0))
 
         moduleDict = self.loadModuleAsDict(test_package['module'])
@@ -400,7 +405,7 @@ class FindMachinesViaWrapperTests(_WritesPythonModules):
         InfiniteLoop.loop = InfiniteLoop
         """
         module = self.makeModule(source, self.pathDir, 'loop.py')
-        self.assertFalse(list(findMachinesViaWrapper(module)))
+        self.assertFalse(list(self.findMachinesViaWrapper(module)))
 
 
 @skipIf(not isTwistedInstalled(), "Twisted is not installed.")
@@ -413,8 +418,14 @@ class WrapFQPNTests(TestCase):
 
     def setUp(self):
         from twisted.python.modules import PythonModule, PythonAttribute
+        from .._discover import wrapFQPN, InvalidFQPN, NoModule, NoObject
+
         self.PythonModule = PythonModule
         self.PythonAttribute = PythonAttribute
+        self.wrapFQPN = wrapFQPN
+        self.InvalidFQPN = InvalidFQPN
+        self.NoModule = NoModule
+        self.NoObject = NoObject
 
     def assertModuleWrapperRefersTo(self, moduleWrapper, module):
         """
@@ -439,8 +450,8 @@ class WrapFQPNTests(TestCase):
         """
         L{wrapFQPN} raises L{InvalidFQPN} when given an empty string.
         """
-        with self.assertRaises(InvalidFQPN):
-            wrapFQPN('')
+        with self.assertRaises(self.InvalidFQPN):
+            self.wrapFQPN('')
 
     def test_failsWithIncorrectDotting(self):
         """"
@@ -448,8 +459,8 @@ class WrapFQPNTests(TestCase):
         incorrectly-dotted FQPN
         """
         for bad in ('.fails', 'fails.', 'this..fails'):
-            with self.assertRaises(InvalidFQPN):
-                wrapFQPN(bad)
+            with self.assertRaises(self.InvalidFQPN):
+                self.wrapFQPN(bad)
 
     def test_singleModule(self):
         """
@@ -458,7 +469,7 @@ class WrapFQPNTests(TestCase):
         """
         import os
 
-        moduleWrapper = wrapFQPN('os')
+        moduleWrapper = self.wrapFQPN('os')
 
         self.assertIsInstance(moduleWrapper, self.PythonModule)
         self.assertIs(moduleWrapper.load(), os)
@@ -468,8 +479,8 @@ class WrapFQPNTests(TestCase):
         L{wrapFQPN} raises L{NoModule} when given a dotless FQPN that does
         not refer to a module or package.
         """
-        with self.assertRaises(NoModule):
-            wrapFQPN("this is not an acceptable name!")
+        with self.assertRaises(self.NoModule):
+            self.wrapFQPN("this is not an acceptable name!")
 
     def test_singlePackage(self):
         """
@@ -477,7 +488,7 @@ class WrapFQPNTests(TestCase):
         referring to the single package a dotless FQPN describes.
         """
         import xml
-        self.assertModuleWrapperRefersTo(wrapFQPN('xml'), xml)
+        self.assertModuleWrapperRefersTo(self.wrapFQPN('xml'), xml)
 
     def test_multiplePackages(self):
         """
@@ -485,7 +496,7 @@ class WrapFQPNTests(TestCase):
         referring to the deepest module described by dotted FQPN.
         """
         import xml.etree
-        self.assertModuleWrapperRefersTo(wrapFQPN('xml.etree'), xml.etree)
+        self.assertModuleWrapperRefersTo(self.wrapFQPN('xml.etree'), xml.etree)
 
     def test_multiplePackagesFinalModule(self):
         """
@@ -494,7 +505,7 @@ class WrapFQPNTests(TestCase):
         """
         import xml.etree.ElementTree
         self.assertModuleWrapperRefersTo(
-            wrapFQPN('xml.etree.ElementTree'), xml.etree.ElementTree)
+            self.wrapFQPN('xml.etree.ElementTree'), xml.etree.ElementTree)
 
     def test_singleModuleObject(self):
         """
@@ -503,7 +514,7 @@ class WrapFQPNTests(TestCase):
         """
         import os
         self.assertAttributeWrapperRefersTo(
-            wrapFQPN('os.path'), 'os.path', os.path)
+            self.wrapFQPN('os.path'), 'os.path', os.path)
 
     def test_multiplePackagesObject(self):
         """
@@ -519,7 +530,7 @@ class WrapFQPNTests(TestCase):
                           ('automat.MethodicalMachine.__doc__',
                            automat.MethodicalMachine.__doc__)]:
             self.assertAttributeWrapperRefersTo(
-                wrapFQPN(fqpn), fqpn, obj)
+                self.wrapFQPN(fqpn), fqpn, obj)
 
     def test_failsWithMultiplePackagesMissingModuleOrPackage(self):
         """
@@ -528,8 +539,8 @@ class WrapFQPNTests(TestCase):
         """
         for bad in ('xml.etree.nope!',
                     'xml.etree.nope!.but.the.rest.is.believable'):
-            with self.assertRaises(NoObject):
-                wrapFQPN(bad)
+            with self.assertRaises(self.NoObject):
+                self.wrapFQPN(bad)
 
 
 @skipIf(not isTwistedInstalled(), "Twisted is not installed.")
@@ -553,6 +564,10 @@ class FindMachinesIntegrationTests(_WritesPythonModules):
 
     def setUp(self):
         super(FindMachinesIntegrationTests, self).setUp()
+        from .._discover import findMachines
+
+        self.findMachines = findMachines
+
         packageDir = self.FilePath(self.pathDir).child("test_package")
         packageDir.makedirs()
         self.pythonPath = self.PythonPath([self.pathDir])
@@ -574,7 +589,7 @@ class FindMachinesIntegrationTests(_WritesPythonModules):
         Given a top-level package FQPN, L{findMachines} discovers all
         L{MethodicalMachine} instances in and below it.
         """
-        machines = sorted(findMachines('test_package'),
+        machines = sorted(self.findMachines('test_package'),
                           key=operator.itemgetter(0))
 
         tpRootLevel = self.packageDict['test_package.rootLevel'].load()
