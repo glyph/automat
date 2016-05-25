@@ -1,10 +1,14 @@
 language: python
 python: 2.7
 env:
-    - TOX_ENV=py27
-    - TOX_ENV=py33
-    - TOX_ENV=py34
-    - TOX_ENV=pypy
+    - TOX_ENV=py27-extras
+    - TOX_ENV=py27-noextras
+    - TOX_ENV=pypy-extras
+    - TOX_ENV=pypy-noextras
+    - TOX_ENV=py33-extras
+    - TOX_ENV=py33-noextras
+    - TOX_ENV=py34-extras
+    - TOX_ENV=py34-noextras
 
 install:
     - sudo apt-get install graphviz
