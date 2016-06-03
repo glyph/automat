@@ -215,7 +215,7 @@ adding a parameter, so that's how you do it in Automat as well.
 ```
 
 However, one important difference here is that *we can't add any
-implememntation code to the input method*.  Inputs are purely a declaration of
+implementation code to the input method*.  Inputs are purely a declaration of
 the interface; the behavior must all come from outputs.  Therefore, the change
 in the state of the coffee machine must be represented as an output.  We can
 add an output method like this:
