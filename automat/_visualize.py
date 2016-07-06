@@ -1,4 +1,11 @@
+from __future__ import print_function
+import argparse
+import sys
+
 import graphviz
+import graphviz.files
+
+from ._discover import findMachines
 
 
 def _gvquote(s):
@@ -97,3 +104,80 @@ def makeDigraph(automaton, inputAsString=repr,
                      stateAsString(outState))
 
     return digraph
+
+
+def tool(_progname=sys.argv[0],
+         _argv=sys.argv[1:],
+         _syspath=sys.path,
+         _findMachines=findMachines,
+         _print=print):
+    """
+    Entry point for command line utility.
+    """
+
+    DESCRIPTION = """
+    Visualize automat.MethodicalMachines as graphviz graphs.
+    """
+    EPILOG = """
+    You must have the graphviz tool suite installed.  Please visit
+    http://www.graphviz.org for more information.
+    """
+    if _syspath[0]:
+        _syspath.insert(0, '')
+    argumentParser = argparse.ArgumentParser(
+        prog=_progname,
+        description=DESCRIPTION,
+        epilog=EPILOG)
+    argumentParser.add_argument('fqpn',
+                                help="A Fully Qualified Path name"
+                                " representing where to find machines.")
+    argumentParser.add_argument('--quiet', '-q',
+                                help="suppress output",
+                                default=False,
+                                action="store_true")
+    argumentParser.add_argument('--dot-directory', '-d',
+                                help="Where to write out .dot files.",
+                                default=".automat_visualize")
+    argumentParser.add_argument('--image-directory', '-i',
+                                help="Where to write out image files.",
+                                default=".automat_visualize")
+    argumentParser.add_argument('--image-type', '-t',
+                                help="The image format.",
+                                choices=graphviz.files.FORMATS,
+                                default='png')
+    argumentParser.add_argument('--view', '-v',
+                                help="View rendered graphs with"
+                                " default image viewer",
+                                default=False,
+                                action="store_true")
+    args = argumentParser.parse_args(_argv)
+
+    explicitlySaveDot = (args.dot_directory
+                         and (not args.image_directory
+                              or args.image_directory != args.dot_directory))
+    if args.quiet:
+        def _print(*args):
+            pass
+
+    for fqpn, machine in _findMachines(args.fqpn):
+        _print(fqpn, '...discovered')
+
+        digraph = machine.asDigraph()
+
+        if explicitlySaveDot:
+            digraph.save(filename="{}.dot".format(fqpn),
+                         directory=args.dot_directory)
+            _print(fqpn, "...wrote dot into", args.dot_directory)
+
+        if args.image_directory:
+            deleteDot = not args.dot_directory or explicitlySaveDot
+            digraph.format = args.image_type
+            digraph.render(filename="{}.dot".format(fqpn),
+                           directory=args.image_directory,
+                           view=args.view,
+                           cleanup=deleteDot)
+            if deleteDot:
+                msg = "...wrote image into"
+            else:
+                msg = "...wrote image and dot into"
+            _print(fqpn, msg, args.image_directory)
