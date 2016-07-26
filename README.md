@@ -191,8 +191,8 @@ and then change your state machine to look like this:
     @machine.output()
     def _report_sending_failure(self):
         print("not connected")
-    connected.upon(send_message, connected, [_actually_send_message])
-    not_connected.upon(send_message, not_connected, [_report_sending_failure])
+    connected.upon(send_message, enter=connected, [_actually_send_message])
+    not_connected.upon(send_message, enter=not_connected, [_report_sending_failure])
 ```
 
 so that the responsibility for knowing which state the state machine is in
