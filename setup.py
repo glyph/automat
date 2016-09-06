@@ -6,12 +6,15 @@ from setuptools import setup, find_packages
 
 setup(
     name='Automat',
-    version='0.3.0',
+    use_scm_version=True,
     description="""
     Self-service finite-state machines for the programmer on the go.
-    """,
+    """.strip(),
     packages=find_packages(exclude=[]),
     package_dir={'automat': 'automat'},
+    setup_requires=[
+        'setuptools-scm',
+    ],
     install_requires=[
         "characteristic",
         "six",
@@ -25,6 +28,8 @@ setup(
             "automat-visualize = automat._visualize:tool"
         ],
     },
+    author_name='Glyph',
+    author_mail='glyph@twistedmatrix.com',
     include_package_data=True,
     license="MIT",
 )

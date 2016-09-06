@@ -2,3 +2,5 @@
 .coverage*
 *.egg-info/
 *.py[co]
+build/
+dist/
