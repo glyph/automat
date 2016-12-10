@@ -3,7 +3,6 @@ import argparse
 import sys
 
 import graphviz
-import graphviz.files
 
 from ._discover import findMachines
 
@@ -143,7 +142,7 @@ def tool(_progname=sys.argv[0],
                                 default=".automat_visualize")
     argumentParser.add_argument('--image-type', '-t',
                                 help="The image format.",
-                                choices=graphviz.files.FORMATS,
+                                choices=graphviz.FORMATS,
                                 default='png')
     argumentParser.add_argument('--view', '-v',
                                 help="View rendered graphs with"

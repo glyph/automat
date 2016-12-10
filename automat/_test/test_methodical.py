@@ -152,7 +152,7 @@ class MethodicalTests(TestCase):
             m = MethodicalMachine()
             @m.input()
             def input(self):
-                pass
+                "an input"
             @m.output()
             def outputA(self):
                 return "A"
@@ -161,7 +161,7 @@ class MethodicalTests(TestCase):
                 return "B"
             @m.state(initial=True)
             def state(self):
-                pass
+                "a state"
             state.upon(input, state, [outputA, outputB],
                        collector=lambda x: reduce(operator.add, x))
         m = Machine()
@@ -194,10 +194,10 @@ class MethodicalTests(TestCase):
             m = MethodicalMachine()
             @m.input()
             def input(self, x, y=1):
-                pass
+                "an input"
             @m.state(initial=True)
             def state(self):
-                pass
+                "a state"
             @m.output()
             def output(self, x, y=1):
                 self._x = x
@@ -218,16 +218,16 @@ class MethodicalTests(TestCase):
             m = MethodicalMachine()
             @m.input()
             def nameOfInput(self, a):
-                pass
+                "an input"
             @m.output()
             def outputThatMatches(self, a):
-                pass
+                "an output that matches"
             @m.output()
             def outputThatDoesntMatch(self, b):
-                pass
+                "an output that doesn't match"
             @m.state()
             def state(self):
-                pass
+                "a state"
             with self.assertRaises(TypeError) as cm:
                 state.upon(nameOfInput, state, [outputThatMatches,
                                                 outputThatDoesntMatch])
@@ -341,7 +341,7 @@ class MethodicalTests(TestCase):
                 "Second state."
             @m.input()
             def input(self):
-                pass
+                "an input"
             @m.output()
             def output(self):
                 self.value = 2
