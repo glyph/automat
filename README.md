@@ -44,7 +44,7 @@ in considerably more detail
 ### What makes Automat different? ###
 
 There are
-[dozens of libraries on PyPI implementing state machines](https://warehouse.python.org/search/project/?q=finite+state+machine).
+[dozens of libraries on PyPI implementing state machines](https://pypi.org/search/?q=finite+state+machine).
 So it behooves me to say why yet another one would be a good idea.
 
 Automat is designed around this principle: while organizing your code around
