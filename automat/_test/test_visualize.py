@@ -5,7 +5,7 @@ import os
 import subprocess
 from unittest import TestCase, skipIf
 
-from characteristic import attributes
+import attr
 
 from .._methodical import MethodicalMachine
 
@@ -103,9 +103,12 @@ class ElementMakerTests(TestCase):
         self.assertEqual(expected, self.elementMaker("div"))
 
 
-@attributes(['name', 'children', 'attrs'])
+@attr.s
 class HTMLElement(object):
     """Holds an HTML element, as created by elementMaker."""
+    name = attr.ib()
+    children = attr.ib()
+    attributes = attr.ib()
 
 
 def findElements(element, predicate):
@@ -140,8 +143,8 @@ class TableMakerTests(TestCase):
     U{http://www.graphviz.org/doc/info/shapes.html}.
     """
 
-    def fakeElementMaker(self, name, *children, **attrs):
-        return HTMLElement(name=name, children=children, attrs=attrs)
+    def fakeElementMaker(self, name, *children, **attributes):
+        return HTMLElement(name=name, children=children, attributes=attributes)
 
     def setUp(self):
         from .._visualize import tableMaker
@@ -160,7 +163,7 @@ class TableMakerTests(TestCase):
 
         def hasPort(element):
             return (not isLeaf(element)
-                    and element.attrs.get("port") == self.port)
+                    and element.attributes.get("port") == self.port)
 
         for outputLabels in ([], ["an output label"]):
             table = self.tableMaker(self.inputLabel, outputLabels,
@@ -183,7 +186,7 @@ class TableMakerTests(TestCase):
         table = self.tableMaker("input label", (), port=self.port)
         self.assertEqual(len(table.children), 1)
         (inputLabelRow,) = table.children
-        self.assertNotIn("colspan", inputLabelRow.attrs)
+        self.assertNotIn("colspan", inputLabelRow.attributes)
 
     def test_withOutputLabels(self):
         """
@@ -201,7 +204,7 @@ class TableMakerTests(TestCase):
         def hasCorrectColspan(element):
             return (not isLeaf(element)
                     and element.name == "td"
-                    and element.attrs.get('colspan') == "2")
+                    and element.attributes.get('colspan') == "2")
 
         self.assertEqual(len(findElements(inputRow, hasCorrectColspan)),
                          1)

@@ -16,7 +16,7 @@ setup(
         'setuptools-scm',
     ],
     install_requires=[
-        "characteristic",
+        "attrs",
         "six",
     ],
     extras_require={
