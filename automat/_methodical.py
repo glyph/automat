@@ -78,7 +78,7 @@ class MethodicalInput(object):
     automaton = attr.ib(repr=False)
     method = attr.ib()
     symbol = attr.ib(repr=False)
-    collectors = attr.ib(default=attr.Factory(dict))
+    collectors = attr.ib(default=attr.Factory(dict), repr=False)
 
 
     def __get__(self, oself, type=None):
