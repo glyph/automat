@@ -4,7 +4,7 @@ from functools import wraps
 from itertools import count
 from inspect import getargspec
 
-from characteristic import with_repr, attributes, Attribute
+import attr
 
 from ._core import Transitioner, Automaton
 from ._introspection import preserveName
@@ -25,12 +25,14 @@ def _keywords_only(f):
     return g
 
 
-@with_repr(['method'])
-@attributes(['machine', 'method', 'serialized'])
+@attr.s
 class MethodicalState(object):
     """
     A state for a L{MethodicalMachine}.
     """
+    machine = attr.ib(repr=False)
+    method = attr.ib()
+    serialized = attr.ib(repr=False)
 
     def upon(self, input, enter, outputs, collector=list):
         """
@@ -68,14 +70,16 @@ def _transitionerFromInstance(oself, symbol, automaton):
     return transitioner
 
 
-@with_repr(['method'])
-@attributes(['automaton', 'method', 'symbol',
-             Attribute('collectors', default_factory=dict)],
-            apply_with_cmp=False)
+@attr.s(cmp=False, hash=False)
 class MethodicalInput(object):
     """
     An input for a L{MethodicalMachine}.
     """
+    automaton = attr.ib(repr=False)
+    method = attr.ib()
+    symbol = attr.ib(repr=False)
+    collectors = attr.ib(default=attr.Factory(dict), repr=False)
+
 
     def __get__(self, oself, type=None):
         """
@@ -97,12 +101,13 @@ class MethodicalInput(object):
         return doInput
 
 
-@with_repr(['method'])
-@attributes(['machine', 'method'])
+@attr.s
 class MethodicalOutput(object):
     """
     An output for a L{MethodicalMachine}.
     """
+    machine = attr.ib(repr=False)
+    method = attr.ib()
 
     def __get__(self, oself, type=None):
         """
