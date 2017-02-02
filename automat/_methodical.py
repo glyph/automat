@@ -2,7 +2,13 @@
 
 from functools import wraps
 from itertools import count
-from inspect import getargspec
+
+try:
+    # Python 3
+    from inspect import getfullargspec as getArgsSpec
+except ImportError:
+    # Python 2
+    from inspect import getargspec as getArgsSpec
 
 import attr
 
@@ -40,9 +46,9 @@ class MethodicalState(object):
         with this L{MethodicalState}: upon the receipt of the input C{input},
         enter the state C{enter}, emitting each output in C{outputs}.
         """
-        inputSpec = getargspec(input.method)
+        inputSpec = getArgsSpec(input.method)
         for output in outputs:
-            outputSpec = getargspec(output.method)
+            outputSpec = getArgsSpec(output.method)
             if inputSpec != outputSpec:
                 raise TypeError(
                     "method {input} signature {inputSignature} "
