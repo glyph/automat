@@ -123,7 +123,7 @@ slot = FoodSlot(Door(), Light())
 
 if __name__ == '__main__':
     import sys
-    sys.stdout.writelines(FoodSlot.machine.graphviz())
+    sys.stdout.writelines(FoodSlot.machine.asDigraph())
     # raw_input("Hit enter to make some food and put it in the slot: ")
     # slot.food()
     # raw_input("Hit enter to insert a coin: ")
