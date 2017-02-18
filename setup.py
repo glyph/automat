@@ -39,8 +39,8 @@ setup(
             "automat-visualize = automat._visualize:tool"
         ],
     },
-    author_name='Glyph',
-    author_mail='glyph@twistedmatrix.com',
+    author='Glyph',
+    author_email='glyph@twistedmatrix.com',
     include_package_data=True,
     license="MIT",
     keywords='fsm finite state machine automata',
