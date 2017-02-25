@@ -11,6 +11,8 @@ env:
     - TOX_ENV=py34-noextras
     - TOX_ENV=py35-extras
     - TOX_ENV=py35-noextras
+    - TOX_ENV=py36-extras
+    - TOX_ENV=py36-noextras
 
 install:
     - sudo apt-get install graphviz
