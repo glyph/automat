@@ -75,6 +75,19 @@ def _transitionerFromInstance(oself, symbol, automaton):
         setattr(oself, symbol, transitioner)
     return transitioner
 
+def assert_no_code(inst, attribute, f):
+    # the function body must be empty, i.e. "pass" or "return None", which
+    # both yield the same bytecode: LOAD_CONST (None), RETURN_VALUE
+    none_const = f.__code__.co_consts.index(None)
+    # this depends upon the function using None as one of the first 256
+    # constants
+    bytecode = f.__code__.co_code
+    c = [ord(bytecode[i:i+1]) for i in range(len(bytecode))]
+    if c != [100, # LOAD_CONST
+             none_const, 0, # 16-bit index into co_consts
+             83, # RETURN_VALUE
+             ]:
+        raise ValueError("function body must be empty")
 
 @attr.s(cmp=False, hash=False)
 class MethodicalInput(object):
@@ -82,7 +95,7 @@ class MethodicalInput(object):
     An input for a L{MethodicalMachine}.
     """
     automaton = attr.ib(repr=False)
-    method = attr.ib()
+    method = attr.ib(validator=assert_no_code)
     symbol = attr.ib(repr=False)
     collectors = attr.ib(default=attr.Factory(dict), repr=False)
 
