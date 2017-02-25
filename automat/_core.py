@@ -145,13 +145,25 @@ class Transitioner(object):
     def __init__(self, automaton, initialState):
         self._automaton = automaton
         self._state = initialState
+        self._tracer = None
 
+    def setTrace(self, tracer):
+        self._tracer = tracer
 
     def transition(self, inputSymbol):
         """
         Transition between states, returning any outputs.
         """
+        initialStateName = self._state._name()
+        inputName = inputSymbol._name()
         outState, outputSymbols = self._automaton.outputForInput(self._state,
                                                                  inputSymbol)
+        outputName = outState._name()
+        outTracer = lambda output: None
+        if self._tracer:
+            self._tracer(initialStateName, inputName, outputName, None)
+            def outTracer(output):
+                self._tracer(initialStateName, inputName, outputName, output)
+
         self._state = outState
-        return outputSymbols
+        return (outputSymbols, outTracer)
