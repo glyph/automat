@@ -253,6 +253,29 @@ class MethodicalTests(TestCase):
                     "The second initial state -- results in a ValueError."
 
 
+    def test_multipleTransitionsFailure(self):
+        """
+        A L{MethodicalMachine} can only have one transition per start/event
+        pair.
+        """
+
+        class WillFail(object):
+            m = MethodicalMachine()
+
+            @m.state(initial=True)
+            def start(self):
+                "We start here."
+            @m.state()
+            def end(self):
+                "Rainbows end."
+
+            @m.input()
+            def event(self):
+                "An event."
+            start.upon(event, enter=end, outputs=[])
+            with self.assertRaises(ValueError):
+                start.upon(event, enter=end, outputs=[])
+
     def test_badTransitionForCurrentState(self):
         """
         Calling any input method that lacks a transition for the machine's
