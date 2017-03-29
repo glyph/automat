@@ -209,6 +209,23 @@ class MethodicalTests(TestCase):
         self.assertEqual(m._x, 3)
 
 
+    def test_inputFunctionsMustBeEmpty(self):
+        """
+        The wrapped input function must have an empty body.
+        """
+        # input functions are executed to assert that the signature matches,
+        # but their body must be empty
+
+        class Mechanism(object):
+            m = MethodicalMachine()
+            with self.assertRaises(ValueError) as cm:
+                @m.input()
+                def input(self):
+                    "an input"
+                    x = 1 # pragma: no cover
+            self.assertEqual(str(cm.exception), "function body must be empty")
+
+
     def test_inputOutputMismatch(self):
         """
         All the argument lists of the outputs for a given input must match; if
