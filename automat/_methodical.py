@@ -83,10 +83,16 @@ def _docstring():
 _docstring()
 
 def assertNoCode(inst, attribute, f):
-    # the function body must be empty, i.e. "pass" or "return None", which
+    # The function body must be empty, i.e. "pass" or "return None", which
     # both yield the same bytecode: LOAD_CONST (None), RETURN_VALUE. We also
     # accept functions with only a docstring, which yields slightly different
     # bytecode, because the "None" is put in a different constant slot.
+
+    # Unfortunately, this does not catch function bodies that return a
+    # constant value, e.g. "return 1", because their code is identical to a
+    # "return None". They differ in the contents of their constant table, but
+    # checking that would require us to parse the bytecode, find the index
+    # being returned, then making sure the table has a None at that index.
     def ordify(bytecode):
         return [ord(bytecode[i:i+1]) for i in range(len(bytecode))]
     expected_empty = ordify(_empty.__code__.co_code)
