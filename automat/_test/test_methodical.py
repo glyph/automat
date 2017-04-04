@@ -233,18 +233,33 @@ class MethodicalTests(TestCase):
             @m.input()
             def input(self):
                 "an input"
+            @m.state(initial=True)
+            def start(self):
+                "starting state"
+            start.upon(input, enter=start, outputs=[])
+        MechanismWithDocstring().input()
 
         class MechanismWithoutDocstring(object):
             m = MethodicalMachine()
             @m.input()
             def input(self):
                 pass
+            @m.state(initial=True)
+            def start(self):
+                "starting state"
+            start.upon(input, enter=start, outputs=[])
+        MechanismWithoutDocstring().input()
 
         class MechanismReturnsNone(object):
             m = MethodicalMachine()
             @m.input()
             def input(self):
                 return None
+            @m.state(initial=True)
+            def start(self):
+                "starting state"
+            start.upon(input, enter=start, outputs=[])
+        MechanismReturnsNone().input()
 
 
 
