@@ -222,7 +222,7 @@ class MethodicalTests(TestCase):
                 @m.input()
                 def input(self):
                     "an input"
-                    x = 1 # pragma: no cover
+                    list() # pragma: no cover
             self.assertEqual(str(cm.exception), "function body must be empty")
 
         # all three of these cases should be valid. Functions/methods with
@@ -239,7 +239,7 @@ class MethodicalTests(TestCase):
             start.upon(input, enter=start, outputs=[])
         MechanismWithDocstring().input()
 
-        class MechanismWithoutDocstring(object):
+        class MechanismWithPass(object):
             m = MethodicalMachine()
             @m.input()
             def input(self):
@@ -248,7 +248,19 @@ class MethodicalTests(TestCase):
             def start(self):
                 "starting state"
             start.upon(input, enter=start, outputs=[])
-        MechanismWithoutDocstring().input()
+        MechanismWithPass().input()
+
+        class MechanismWithDocstringAndPass(object):
+            m = MethodicalMachine()
+            @m.input()
+            def input(self):
+                "an input"
+                pass
+            @m.state(initial=True)
+            def start(self):
+                "starting state"
+            start.upon(input, enter=start, outputs=[])
+        MechanismWithDocstringAndPass().input()
 
         class MechanismReturnsNone(object):
             m = MethodicalMachine()
@@ -260,6 +272,18 @@ class MethodicalTests(TestCase):
                 "starting state"
             start.upon(input, enter=start, outputs=[])
         MechanismReturnsNone().input()
+
+        class MechanismWithDocstringAndReturnsNone(object):
+            m = MethodicalMachine()
+            @m.input()
+            def input(self):
+                "an input"
+                return None
+            @m.state(initial=True)
+            def start(self):
+                "starting state"
+            start.upon(input, enter=start, outputs=[])
+        MechanismWithDocstringAndReturnsNone().input()
 
 
 
