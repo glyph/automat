@@ -225,6 +225,28 @@ class MethodicalTests(TestCase):
                     x = 1 # pragma: no cover
             self.assertEqual(str(cm.exception), "function body must be empty")
 
+        # all three of these cases should be valid. Functions/methods with
+        # docstrings produce slightly different bytecode than ones without.
+
+        class MechanismWithDocstring(object):
+            m = MethodicalMachine()
+            @m.input()
+            def input(self):
+                "an input"
+
+        class MechanismWithoutDocstring(object):
+            m = MethodicalMachine()
+            @m.input()
+            def input(self):
+                pass
+
+        class MechanismReturnsNone(object):
+            m = MethodicalMachine()
+            @m.input()
+            def input(self):
+                return None
+
+
 
     def test_inputOutputMismatch(self):
         """

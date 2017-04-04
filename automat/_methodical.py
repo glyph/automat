@@ -75,18 +75,24 @@ def _transitionerFromInstance(oself, symbol, automaton):
         setattr(oself, symbol, transitioner)
     return transitioner
 
+def _empty():
+    pass
+_empty() # chase coverage
+def _docstring():
+    """docstring"""
+_docstring()
+
 def assertNoCode(inst, attribute, f):
     # the function body must be empty, i.e. "pass" or "return None", which
-    # both yield the same bytecode: LOAD_CONST (None), RETURN_VALUE
-    none_const = f.__code__.co_consts.index(None)
-    # this depends upon the function using None as one of the first 256
-    # constants
-    bytecode = f.__code__.co_code
-    c = [ord(bytecode[i:i+1]) for i in range(len(bytecode))]
-    if c != [100, # LOAD_CONST
-             none_const, 0, # 16-bit index into co_consts
-             83, # RETURN_VALUE
-             ]:
+    # both yield the same bytecode: LOAD_CONST (None), RETURN_VALUE. We also
+    # accept functions with only a docstring, which yields slightly different
+    # bytecode, because the "None" is put in a different constant slot.
+    def ordify(bytecode):
+        return [ord(bytecode[i:i+1]) for i in range(len(bytecode))]
+    expected_empty = ordify(_empty.__code__.co_code)
+    expected_docstring = ordify(_docstring.__code__.co_code)
+    bytecode = ordify(f.__code__.co_code)
+    if bytecode not in (expected_empty, expected_docstring):
         raise ValueError("function body must be empty")
 
 @attr.s(cmp=False, hash=False)
