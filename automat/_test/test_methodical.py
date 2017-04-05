@@ -7,6 +7,7 @@ from functools import reduce
 from unittest import TestCase
 
 from .. import MethodicalMachine, NoTransition
+from .. import _methodical
 
 class MethodicalTests(TestCase):
     """
@@ -215,6 +216,9 @@ class MethodicalTests(TestCase):
         """
         # input functions are executed to assert that the signature matches,
         # but their body must be empty
+
+        _methodical._empty() # chase coverage
+        _methodical._docstring()
 
         class Mechanism(object):
             m = MethodicalMachine()

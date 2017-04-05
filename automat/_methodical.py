@@ -75,12 +75,12 @@ def _transitionerFromInstance(oself, symbol, automaton):
         setattr(oself, symbol, transitioner)
     return transitioner
 
+
 def _empty():
     pass
-_empty() # chase coverage
+
 def _docstring():
     """docstring"""
-_docstring()
 
 def assertNoCode(inst, attribute, f):
     # The function body must be empty, i.e. "pass" or "return None", which
@@ -93,13 +93,11 @@ def assertNoCode(inst, attribute, f):
     # "return None". They differ in the contents of their constant table, but
     # checking that would require us to parse the bytecode, find the index
     # being returned, then making sure the table has a None at that index.
-    def ordify(bytecode):
-        return [ord(bytecode[i:i+1]) for i in range(len(bytecode))]
-    expected_empty = ordify(_empty.__code__.co_code)
-    expected_docstring = ordify(_docstring.__code__.co_code)
-    bytecode = ordify(f.__code__.co_code)
-    if bytecode not in (expected_empty, expected_docstring):
+
+    if f.__code__.co_code not in (_empty.__code__.co_code,
+                                  _docstring.__code__.co_code):
         raise ValueError("function body must be empty")
+
 
 @attr.s(cmp=False, hash=False)
 class MethodicalInput(object):
