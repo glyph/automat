@@ -75,19 +75,29 @@ def _transitionerFromInstance(oself, symbol, automaton):
         setattr(oself, symbol, transitioner)
     return transitioner
 
+
+def _empty():
+    pass
+
+def _docstring():
+    """docstring"""
+
 def assertNoCode(inst, attribute, f):
-    # the function body must be empty, i.e. "pass" or "return None", which
-    # both yield the same bytecode: LOAD_CONST (None), RETURN_VALUE
-    none_const = f.__code__.co_consts.index(None)
-    # this depends upon the function using None as one of the first 256
-    # constants
-    bytecode = f.__code__.co_code
-    c = [ord(bytecode[i:i+1]) for i in range(len(bytecode))]
-    if c != [100, # LOAD_CONST
-             none_const, 0, # 16-bit index into co_consts
-             83, # RETURN_VALUE
-             ]:
+    # The function body must be empty, i.e. "pass" or "return None", which
+    # both yield the same bytecode: LOAD_CONST (None), RETURN_VALUE. We also
+    # accept functions with only a docstring, which yields slightly different
+    # bytecode, because the "None" is put in a different constant slot.
+
+    # Unfortunately, this does not catch function bodies that return a
+    # constant value, e.g. "return 1", because their code is identical to a
+    # "return None". They differ in the contents of their constant table, but
+    # checking that would require us to parse the bytecode, find the index
+    # being returned, then making sure the table has a None at that index.
+
+    if f.__code__.co_code not in (_empty.__code__.co_code,
+                                  _docstring.__code__.co_code):
         raise ValueError("function body must be empty")
+
 
 @attr.s(cmp=False, hash=False)
 class MethodicalInput(object):

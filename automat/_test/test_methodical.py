@@ -7,6 +7,7 @@ from functools import reduce
 from unittest import TestCase
 
 from .. import MethodicalMachine, NoTransition
+from .. import _methodical
 
 class MethodicalTests(TestCase):
     """
@@ -216,14 +217,78 @@ class MethodicalTests(TestCase):
         # input functions are executed to assert that the signature matches,
         # but their body must be empty
 
+        _methodical._empty() # chase coverage
+        _methodical._docstring()
+
         class Mechanism(object):
             m = MethodicalMachine()
             with self.assertRaises(ValueError) as cm:
                 @m.input()
                 def input(self):
                     "an input"
-                    x = 1 # pragma: no cover
+                    list() # pragma: no cover
             self.assertEqual(str(cm.exception), "function body must be empty")
+
+        # all three of these cases should be valid. Functions/methods with
+        # docstrings produce slightly different bytecode than ones without.
+
+        class MechanismWithDocstring(object):
+            m = MethodicalMachine()
+            @m.input()
+            def input(self):
+                "an input"
+            @m.state(initial=True)
+            def start(self):
+                "starting state"
+            start.upon(input, enter=start, outputs=[])
+        MechanismWithDocstring().input()
+
+        class MechanismWithPass(object):
+            m = MethodicalMachine()
+            @m.input()
+            def input(self):
+                pass
+            @m.state(initial=True)
+            def start(self):
+                "starting state"
+            start.upon(input, enter=start, outputs=[])
+        MechanismWithPass().input()
+
+        class MechanismWithDocstringAndPass(object):
+            m = MethodicalMachine()
+            @m.input()
+            def input(self):
+                "an input"
+                pass
+            @m.state(initial=True)
+            def start(self):
+                "starting state"
+            start.upon(input, enter=start, outputs=[])
+        MechanismWithDocstringAndPass().input()
+
+        class MechanismReturnsNone(object):
+            m = MethodicalMachine()
+            @m.input()
+            def input(self):
+                return None
+            @m.state(initial=True)
+            def start(self):
+                "starting state"
+            start.upon(input, enter=start, outputs=[])
+        MechanismReturnsNone().input()
+
+        class MechanismWithDocstringAndReturnsNone(object):
+            m = MethodicalMachine()
+            @m.input()
+            def input(self):
+                "an input"
+                return None
+            @m.state(initial=True)
+            def start(self):
+                "starting state"
+            start.upon(input, enter=start, outputs=[])
+        MechanismWithDocstringAndReturnsNone().input()
+
 
 
     def test_inputOutputMismatch(self):
