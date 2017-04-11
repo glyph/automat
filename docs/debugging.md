@@ -5,7 +5,8 @@ time an input event causes the state machine to move from one state to
 another. This can help you figure out problems caused by events occurring in
 the wrong order, or not happening at all. Your callback function can print a
 message to stdout, write something to a logfile, or deliver the information
-in any application-specific way you like.
+in any application-specific way you like. The only restriction is that the
+function must not touch the state machine at all.
 
 To prepare the state machine for tracing, you must assign a name to the
 "setTrace" method in your class. In this example, we use
@@ -42,7 +43,7 @@ callback for that particular instance by calling the
 
 ```python
 s = Sample()
-def tracer(oldState, input, newState, output):
+def tracer(oldState, input, newState):
     pass
 s.setTheTracingFunction(tracer)
 ```
@@ -53,31 +54,29 @@ to hide that `mm` object from external access. And you cannot set the tracing
 function at class-definition time (e.g. a class-level `mm.setTrace(tracer)`)
 because the state machine has merely been *defined* at that point, not
 instantiated (you might eventually have multiple instances of the Sample
-class, each with their own independent state machine).
+class, each with their own independent state machine), and each one can be
+traced separately.
 
 ## The Tracer Callback Function
 
 When the input event is received, before any transitions are made, the tracer
-function is called with four positional arguments:
+function is called with three positional arguments:
 
 * `oldState`: a string with the name of the current state
 * `input`: a string with the name of the input event
 * `newState`: a string with the name of the new state
-* `output`: None
 
-In addition, just before each output function is executed (if any), the
-tracer function will be called again, with the same
-`oldState`/`input`/`newState` arguments, plus an additional `output` string
-(with the name of the output function being invoked).
+If your tracer function returns None, then you will only be notified about
+the input events. But, if your tracer function returns a callable, then just
+before each output function is executed (if any), that callable will be
+executed with a single `output` argument (as a string).
 
-If you only care about the transitions, your tracing function can just do
-nothing unless `output is None`:
+So if you only care about the transitions, your tracing function can just do:
 
 ```python
  s = Sample()
- def tracer(oldState, input, newState, output):
-     if output is None:
-         print("%s.%s -> %s" % (oldState, input, newState))
+ def tracer(oldState, input, newState):
+     print("%s.%s -> %s" % (oldState, input, newState))
  s.setTheTracingFunction(tracer)
  s.go()
  # prints:
@@ -86,15 +85,15 @@ nothing unless `output is None`:
 
 But if you want to know when each output is invoked (perhaps to compare
 against other log messages emitted from inside those output functions), you
-should look at `output` too:
+can do:
 
 ```python
  s = Sample()
- def tracer(oldState, input, newState, output):
-     if output is None:
-         print("%s.%s -> %s" % (oldState, input, newState))
-     else:
+ def tracer(oldState, input, newState):
+     def traceOutputs(output):
          print("%s.%s -> %s: %s()" % (oldState, input, newState, output))
+     print("%s.%s -> %s" % (oldState, input, newState))
+     return traceOutputs
  s.setTheTracingFunction(tracer)
  s.go()
  # prints:
@@ -119,15 +118,10 @@ second as "foo2" to avoid confusion.
 ```python
  s1 = Sample()
  s2 = Sample()
- def tracer1(oldState, input, newState, output):
-     if output is None:
-         print("S1: %s.%s -> %s" % (oldState, input, newState))
+ def tracer1(oldState, input, newState):
+     print("S1: %s.%s -> %s" % (oldState, input, newState))
  s1.setTheTracingFunction(tracer1)
- def tracer2(oldState, input, newState, output):
-     if output is None:
-         print("S2: %s.%s -> %s" % (oldState, input, newState))
+ def tracer2(oldState, input, newState):
+     print("S2: %s.%s -> %s" % (oldState, input, newState))
  s2.setTheTracingFunction(tracer2)
- ```
-
-Of course you can reduce the boilerplate required by (careful) use of
-closures, lambdas, and default arguments.
+```

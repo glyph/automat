@@ -36,10 +36,39 @@ class SampleObject(object):
     middle.upon(back, begin, [])
 
 class TraceTests(TestCase):
-    def test_trace(self):
+    def test_only_inputs(self):
         traces = []
-        def tracer(old_state, input, new_state, output):
-            traces.append((old_state, input, new_state, output))
+        def tracer(old_state, input, new_state):
+            traces.append((old_state, input, new_state))
+            return None # "I only care about inputs, not outputs"
+        s = SampleObject()
+        s.setTrace(tracer)
+
+        s.go1()
+        self.assertEqual(traces, [("begin", "go1", "middle"),
+                                  ])
+
+        s.go2()
+        self.assertEqual(traces, [("begin", "go1", "middle"),
+                                  ("middle", "go2", "end"),
+                                  ])
+        s.setTrace(None)
+        s.back()
+        self.assertEqual(traces, [("begin", "go1", "middle"),
+                                  ("middle", "go2", "end"),
+                                  ])
+        s.go2()
+        self.assertEqual(traces, [("begin", "go1", "middle"),
+                                  ("middle", "go2", "end"),
+                                  ])
+
+    def test_inputs_and_outputs(self):
+        traces = []
+        def tracer(old_state, input, new_state):
+            traces.append((old_state, input, new_state, None))
+            def trace_outputs(output):
+                traces.append((old_state, input, new_state, output))
+            return trace_outputs # "I care about outputs too"
         s = SampleObject()
         s.setTrace(tracer)
 

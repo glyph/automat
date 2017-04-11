@@ -154,16 +154,12 @@ class Transitioner(object):
         """
         Transition between states, returning any outputs.
         """
-        initialStateName = self._state._name()
-        inputName = inputSymbol._name()
         outState, outputSymbols = self._automaton.outputForInput(self._state,
                                                                  inputSymbol)
-        outputName = outState._name()
-        outTracer = lambda output: None
+        outTracer = None
         if self._tracer:
-            self._tracer(initialStateName, inputName, outputName, None)
-            def outTracer(output):
-                self._tracer(initialStateName, inputName, outputName, output)
-
+            outTracer = self._tracer(self._state._name(),
+                                     inputSymbol._name(),
+                                     outState._name())
         self._state = outState
         return (outputSymbols, outTracer)

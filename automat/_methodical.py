@@ -130,7 +130,8 @@ class MethodicalInput(object):
             collector = self.collectors[previousState]
             values = []
             for output in outputs:
-                outTracer(output._name())
+                if outTracer:
+                    outTracer(output._name())
                 value = output(oself, *args, **kwargs)
                 values.append(value)
             return collector(values)
