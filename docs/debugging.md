@@ -1,5 +1,11 @@
 # Tracing API
 
+(NOTE: the Tracing API is currently private and unstable. Use it for
+local debugging, but if you think you need to commit code that
+references it, you should either pin your dependency on the current
+version of Automat, or at least be prepared for your application to
+break when this API is changed or removed).
+
 The tracing API lets you assign a callback function that will be invoked each
 time an input event causes the state machine to move from one state to
 another. This can help you figure out problems caused by events occurring in
@@ -9,7 +15,7 @@ in any application-specific way you like. The only restriction is that the
 function must not touch the state machine at all.
 
 To prepare the state machine for tracing, you must assign a name to the
-"setTrace" method in your class. In this example, we use
+"_setTrace" method in your class. In this example, we use
 `setTheTracingFunction`, but the name can be anything you like:
 
 ```python
@@ -32,7 +38,7 @@ class Sample(object):
     def doThing2(self):
         "second thing to do"
     
-    setTheTracingFunction = mm.setTrace
+    setTheTracingFunction = mm._setTrace
     
     begin.upon(go, enter=end, outputs=[doThing1, doThing2])
 ```
@@ -49,13 +55,24 @@ s.setTheTracingFunction(tracer)
 ```
 
 Note that you cannot shortcut the name-assignment step:
-`s.mm.setTrace(tracer)` will not work, because Automat goes to great lengths
-to hide that `mm` object from external access. And you cannot set the tracing
-function at class-definition time (e.g. a class-level `mm.setTrace(tracer)`)
-because the state machine has merely been *defined* at that point, not
-instantiated (you might eventually have multiple instances of the Sample
-class, each with their own independent state machine), and each one can be
-traced separately.
+`s.mm._setTrace(tracer)` will not work, because Automat goes to great
+lengths to hide that `mm` object from external access. And you cannot
+set the tracing function at class-definition time (e.g. a class-level
+`mm._setTrace(tracer)`) because the state machine has merely been
+*defined* at that point, not instantiated (you might eventually have
+multiple instances of the Sample class, each with their own independent
+state machine), and each one can be traced separately.
+
+Since this is a private API, consider using a tolerant `getattr` when
+retrieving the `_getTrace` method. This way, if you do commit code which
+references it, but you only *call* that code during debugging, then at
+least your application or tests won't crash when the API is removed
+entirely:
+
+```
+mm = MethodicalMachine()
+setTheTracingFunction = getattr(mm, "_setTrace", lambda self, f: None)
+```
 
 ## The Tracer Callback Function
 

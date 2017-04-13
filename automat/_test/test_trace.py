@@ -28,7 +28,7 @@ class SampleObject(object):
     def out(self):
         "sample output"
 
-    setTrace = mm.setTrace
+    setTrace = mm._setTrace
 
     begin.upon(go1, middle, [out])
     middle.upon(go2, end, [out])

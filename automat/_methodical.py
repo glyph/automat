@@ -340,7 +340,7 @@ class MethodicalMachine(object):
         return decorator
 
     @property
-    def setTrace(self):
+    def _setTrace(self):
         return MethodicalTracer(self._automaton, self._symbol)
 
     def asDigraph(self):
