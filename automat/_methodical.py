@@ -61,6 +61,9 @@ class MethodicalState(object):
                 ))
         self.machine._oneTransition(self, input, enter, outputs, collector)
 
+    def _name(self):
+        return self.method.__name__
+
 
 def _transitionerFromInstance(oself, symbol, automaton):
     """
@@ -123,11 +126,19 @@ class MethodicalInput(object):
         def doInput(*args, **kwargs):
             self.method(oself, *args, **kwargs)
             previousState = transitioner._state
-            outputs = transitioner.transition(self)
+            (outputs, outTracer) = transitioner.transition(self)
             collector = self.collectors[previousState]
-            return collector(output(oself, *args, **kwargs)
-                             for output in outputs)
+            values = []
+            for output in outputs:
+                if outTracer:
+                    outTracer(output._name())
+                value = output(oself, *args, **kwargs)
+                values.append(value)
+            return collector(values)
         return doInput
+
+    def _name(self):
+        return self.method.__name__
 
 
 @attr.s
@@ -156,6 +167,22 @@ class MethodicalOutput(object):
         Call the underlying method.
         """
         return self.method(oself, *args, **kwargs)
+
+    def _name(self):
+        return self.method.__name__
+
+@attr.s(cmp=False, hash=False)
+class MethodicalTracer(object):
+    automaton = attr.ib(repr=False)
+    symbol = attr.ib(repr=False)
+
+
+    def __get__(self, oself, type=None):
+        transitioner = _transitionerFromInstance(oself, self.symbol,
+                                                 self.automaton)
+        def setTrace(tracer):
+            transitioner.setTrace(tracer)
+        return setTrace
 
 
 
@@ -312,6 +339,9 @@ class MethodicalMachine(object):
             return unserialize
         return decorator
 
+    @property
+    def _setTrace(self):
+        return MethodicalTracer(self._automaton, self._symbol)
 
     def asDigraph(self):
         """
