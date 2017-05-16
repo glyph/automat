@@ -31,7 +31,7 @@ def _keywords_only(f):
     return g
 
 
-@attr.s
+@attr.s(frozen=True)
 class MethodicalState(object):
     """
     A state for a L{MethodicalMachine}.
@@ -141,7 +141,7 @@ class MethodicalInput(object):
         return self.method.__name__
 
 
-@attr.s
+@attr.s(frozen=True)
 class MethodicalOutput(object):
     """
     An output for a L{MethodicalMachine}.
