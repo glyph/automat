@@ -36,4 +36,4 @@ class CoffeeBrewer(object):
 
 cb = CoffeeBrewer()
 cb.put_in_beans("real good beans")
-print((cb.brew_button()))
+print(cb.brew_button())

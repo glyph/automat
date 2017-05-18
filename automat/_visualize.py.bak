@@ -1,4 +1,4 @@
-
+from __future__ import print_function
 import argparse
 import sys
 
@@ -22,7 +22,7 @@ def elementMaker(name, *children, **attrs):
     formattedAttrs = ' '.join('{}={}'.format(key, _gvquote(str(value)))
                               for key, value in sorted(attrs.items()))
     formattedChildren = ''.join(children)
-    return '<{name} {attrs}>{children}</{name}>'.format(
+    return u'<{name} {attrs}>{children}</{name}>'.format(
         name=name,
         attrs=formattedAttrs,
         children=formattedChildren)
