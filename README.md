@@ -121,7 +121,7 @@ in it.
 ```
 
 Finally, you hook everything together with the `upon` method of the functions
-decorated with `machine.state`:
+decorated with `_machine.state`:
 
 ```python
 
@@ -176,19 +176,19 @@ connection_state_machine.send_message()
 and then change your state machine to look like this:
 
 ```python
-    @machine.state()
+    @_machine.state()
     def connected(self):
         "connected"
-    @machine.state()
+    @_machine.state()
     def not_connected(self):
         "not connected"
-    @machine.input()
+    @_machine.input()
     def send_message(self):
         "send a message"
-    @machine.output()
+    @_machine.output()
     def _actually_send_message(self):
         self._transport.send(b"message")
-    @machine.output()
+    @_machine.output()
     def _report_sending_failure(self):
         print("not connected")
     connected.upon(send_message, enter=connected, [_actually_send_message])
@@ -315,14 +315,14 @@ off, and flipped to reverse its state:
 
 ```python
 class LightSwitch(object):
-    machine = MethodicalMachine()
-    @machine.state(serialized="on")
+    _machine = MethodicalMachine()
+    @_machine.state(serialized="on")
     def on_state(self):
         "the switch is on"
-    @machine.state(serialized="off", initial=True)
+    @_machine.state(serialized="off", initial=True)
     def off_state(self):
         "the switch is off"
-    @machine.input()
+    @_machine.input()
     def flip(self):
         "flip the switch"
     on_state.upon(flip, enter=off_state, outputs=[])
@@ -336,13 +336,13 @@ the off state is represented by the string `"off"`.
 Now, let's just add an input that lets us tell if the switch is on or not.
 
 ```python
-    @machine.input()
+    @_machine.input()
     def query_power(self):
         "return True if powered, False otherwise"
-    @machine.output()
+    @_machine.output()
     def _is_powered(self):
         return True
-    @machine.output()
+    @_machine.output()
     def _not_powered(self):
         return False
     on_state.upon(query_power, enter=on_state, outputs=[_is_powered],
@@ -361,14 +361,14 @@ return *all* relevant state for serialization.
 For our simple light switch, such a method might look like this:
 
 ```python
-    @machine.serializer()
+    @_machine.serializer()
     def save(self, state):
         return {"is-it-on": state}
 ```
 
 Serializers can be public methods, and they can return whatever you like.  If
 necessary, you can have different serializers - just multiple methods decorated
-with `@machine.serializer()` - for different formats; return one data-structure
+with `@_machine.serializer()` - for different formats; return one data-structure
 for JSON, one for XML, one for a database row, and so on.
 
 When it comes time to unserialize, though, you generally want a private method,
@@ -382,7 +382,7 @@ serializer has returned as an argument.
 So our unserializer would look like this:
 
 ```python
-    @machine.unserializer()
+    @_machine.unserializer()
     def _restore(self, blob):
         return blob["is-it-on"]
 ```
