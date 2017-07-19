@@ -109,7 +109,7 @@ only two states are `have_beans` and `dont_have_beans`:
         "In this state, you don't have any beans."
 ```
 
-`have_beans` is the `initial` state because `CoffeeBrewer` starts without beans
+`dont_have_beans` is the `initial` state because `CoffeeBrewer` starts without beans
 in it.
 
 (And another input to put some beans in:)
