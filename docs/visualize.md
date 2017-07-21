@@ -1,6 +1,6 @@
 # Installation
 
-To create state machine graphs you must to install `automat` with the graphing dependencies.
+To create state machine graphs you must install `automat` with the graphing dependencies.
 
 ```
 pip install automat[visualize]
@@ -8,12 +8,12 @@ pip install automat[visualize]
 
 # Example
 
-Given a simple project file structure of:
+Given the following project structure:
 
 ```
-.
-└── mystatemachine
-    └── __init__.py
+mystate/
+├── __init__.py
+└── machine.py
 ```
 
 And the following state machine defined in `__init__.py`
@@ -52,17 +52,18 @@ class MyMachine(object):
     state_a.upon(change_state, enter=state_b, outputs=[output_on_change_state])
 ```
 
-A state machine visualization can be generated with:
+You can generate a state machine visualization by running:
 
 ```
-$ automat-visualize mystatemachine
-mystatemachine.MyMachine._machine ...discovered
-mystatemachine.MyMachine._machine ...wrote image and dot into .automat_visualize
+$ automat-visualize mystate
+mystate.machine.MyMachine._machine ...discovered
+mystate.machine.MyMachine._machine ...wrote image and dot into .automat_visualize
 ```
+
 
 The `dot` file and `png` will be saved in the default output directory of `.automat_visualize/mystatemachine.MyMachine._machine.dot.png
 
-![mystatemachine](images/mystatemachine.MyMachine._machine.dot.png)
+![mystatemachine](images/mystate.machine.MyMachine._machine.dot.png)
 
 
 # `automat-visualize` help
