@@ -61,7 +61,7 @@ mystate.machine.MyMachine._machine ...wrote image and dot into .automat_visualiz
 ```
 
 
-The `dot` file and `png` will be saved in the default output directory of `.automat_visualize/mystatemachine.MyMachine._machine.dot.png
+The `dot` file and `png` will be saved in the default output directory of `.automat_visualize/mystatemachine.MyMachine._machine.dot.png`
 
 ![mystatemachine](images/mystate.machine.MyMachine._machine.dot.png)
 
