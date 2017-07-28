@@ -16,7 +16,7 @@ mystate/
 └── machine.py
 ```
 
-And the following state machine defined in `__init__.py`
+And the following state machine defined in `machine.py`
 
 ```
 from automat import MethodicalMachine
