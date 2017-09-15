@@ -114,7 +114,7 @@ because `CoffeeBrewer` starts without beans in it.
             "The user put in some beans."
 
 
-Finally, you hook everything together with the `upon` method
+Finally, you hook everything together with the :py:meth:`.upon` method
 of the functions decorated with `_machine.state`:
 
 .. code-block:: python
@@ -339,13 +339,13 @@ Since every input can produce multiple outputs, in automat,
 the default return value from every input invocation is a `list`.
 In this case, we have both `_heat_the_heating_element`
 and `_describe_coffee` outputs, so we're seeing both of their return values.
-However, this can be customized, with the `collector` argument to `upon`;
+However, this can be customized, with the `collector` argument to :py:meth:`.upon`;
 the `collector` is a callable which takes an iterable of all the outputs'
 return values and "collects" a single return value
 to return to the caller of the state machine.
 
 In this case, we only care about the last output,
-so we can adjust the call to `upon` like this:
+so we can adjust the call to :py:meth:`.upon` like this:
 
 .. code-block:: python
 
