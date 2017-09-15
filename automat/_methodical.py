@@ -42,9 +42,22 @@ class MethodicalState(object):
 
     def upon(self, input, enter, outputs, collector=list):
         """
-        Declare a state transition within the L{MethodicalMachine} associated
-        with this L{MethodicalState}: upon the receipt of the input C{input},
-        enter the state C{enter}, emitting each output in C{outputs}.
+        Declare a state transition within the :class:`automat.MethodicalMachine`
+        associated with this :class:`automat.MethodicalState`:
+        upon the receipt of the `input`, enter the `state`,
+        emitting each output in `outputs`.
+
+        :param MethodicalInput input: The input triggering a state transition.
+        :param MethodicalState enter: The resulting state.
+        :param Iterable[MethodicalOutput] outputs: The outputs to be triggered
+            as a result of the declared state transition.
+        :param Callable collector: The function to be used when collecting
+            output return values.
+
+        :raises TypeError: if any of the `outputs` signatures do not match
+            the `inputs` signature.
+        :raises ValueError: if the state transition from `self` via `input`
+            has already been defined.
         """
         inputSpec = getArgsSpec(input.method)
         for output in outputs:
@@ -197,8 +210,8 @@ def gensym():
 
 class MethodicalMachine(object):
     """
-    A L{MethodicalMachine} is an interface to an L{Automaton} that uses methods
-    on a class.
+    A :class:`MethodicalMachine` is an interface to an `Automaton`
+    that uses methods on a class.
     """
 
     def __init__(self):
@@ -228,20 +241,18 @@ class MethodicalMachine(object):
         This is a decorator for methods, but it will modify the method so as
         not to be callable any more.
 
-        @param initial: is this state the initial state?  Only one state on
-            this L{MethodicalMachine} may be an initial state; more than one is
-            an error.
-        @type initial: L{bool}
+        :param bool initial: is this state the initial state?
+            Only one state on this :class:`automat.MethodicalMachine`
+            may be an initial state; more than one is an error.
 
-        @param terminal: Is this state a terminal state, i.e. a state that the
-            machine can end up in?  (This is purely informational at this
-            point.)
-        @type terminal: L{bool}
+        :param bool terminal: Is this state a terminal state?
+            i.e. a state that the machine can end up in?
+            (This is purely informational at this point.)
 
-        @param serialized: a serializable value to be used to represent this
-            state to external systems.  This value should be hashable;
-            L{unicode} is a good type to use.
-        @type serialized: a hashable (comparable) value
+        :param Hashable serialized: a serializable value
+            to be used to represent this state to external systems.
+            This value should be hashable;
+            :py:func:`unicode` is a good type to use.
         """
         def decorator(stateMethod):
             state = MethodicalState(machine=self,
@@ -275,7 +286,7 @@ class MethodicalMachine(object):
         This is a decorator for methods.
 
         This method will be called when the state machine transitions to this
-        state as specified in the L{MethodicalMachine.output} method.
+        state as specified in the decorated `output` method.
         """
         def decorator(outputMethod):
             return MethodicalOutput(machine=self, method=outputMethod)
