@@ -56,12 +56,3 @@ in considerably more detail
    visualize
    api
    debugging
-
-
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
