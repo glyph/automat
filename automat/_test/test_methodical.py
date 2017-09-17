@@ -6,6 +6,8 @@ Tests for the public interface of Automat.
 from functools import reduce
 from unittest import TestCase
 
+import six
+
 from .. import MethodicalMachine, NoTransition
 from .. import _methodical
 
@@ -210,6 +212,54 @@ class MethodicalTests(TestCase):
         self.assertEqual(m._x, 3)
 
 
+    def test_outputWithSubsetOfArguments(self):
+        """
+        Inputs pass arguments that output will accept.
+        """
+        class Mechanism(object):
+            m = MethodicalMachine()
+            @m.input()
+            def input(self, x, y=1):
+                "an input"
+            @m.state(initial=True)
+            def state(self):
+                "a state"
+            @m.output()
+            def outputX(self, x):
+                self._x = x
+                return x
+            @m.output()
+            def outputY(self, y):
+                self._y = y
+                return y
+            @m.output()
+            def outputNoArgs(self):
+                return None
+            state.upon(input, state, [outputX, outputY, outputNoArgs])
+
+        m = Mechanism()
+
+        # Pass x as positional argument.
+        self.assertEqual(m.input(3), [3, 1, None])
+        self.assertEqual(m._x, 3)
+        self.assertEqual(m._y, 1)
+
+        # Pass x as key word argument.
+        self.assertEqual(m.input(x=4), [4, 1, None])
+        self.assertEqual(m._x, 4)
+        self.assertEqual(m._y, 1)
+
+        # Pass y as positional argument.
+        self.assertEqual(m.input(6, 3), [6, 3, None])
+        self.assertEqual(m._x, 6)
+        self.assertEqual(m._y, 3)
+
+        # Pass y as key word argument.
+        self.assertEqual(m.input(5, y=2), [5, 2, None])
+        self.assertEqual(m._x, 5)
+        self.assertEqual(m._y, 2)
+
+
     def test_inputFunctionsMustBeEmpty(self):
         """
         The wrapped input function must have an empty body.
@@ -290,7 +340,6 @@ class MethodicalTests(TestCase):
         MechanismWithDocstringAndReturnsNone().input()
 
 
-
     def test_inputOutputMismatch(self):
         """
         All the argument lists of the outputs for a given input must match; if
@@ -315,6 +364,44 @@ class MethodicalTests(TestCase):
                                                 outputThatDoesntMatch])
             self.assertIn("nameOfInput", str(cm.exception))
             self.assertIn("outputThatDoesntMatch", str(cm.exception))
+
+
+    def test_inputOutputTypeMismatch(self):
+        """
+        All the argument lists of the outputs for a given input must match; if
+        one does not the call to C{upon} will raise a C{TypeError}.
+        """
+        if six.PY2:
+            self.skipTest('type annotations are python 3 only')
+
+        # Using exec seemed like the simplest way to put type annotations
+        # in a python 2 compatible code base :/
+
+        test_body = """
+class Mechanism(object):
+    m = MethodicalMachine()
+    @m.input()
+    def nameOfInput(self, a: int):
+        "an input"
+    @m.output()
+    def outputThatMatches(self, a: int):
+        "an output that matches"
+    @m.output()
+    def outputThatDoesntMatch(self, a: str):
+        "an output that doesn't match"
+    @m.state()
+    def state(self):
+        "a state"
+    with self.assertRaises(TypeError) as cm:
+        state.upon(nameOfInput, state, [outputThatMatches,
+                                        outputThatDoesntMatch])
+    self.assertIn("nameOfInput", str(cm.exception))
+    self.assertIn("outputThatDoesntMatch", str(cm.exception))
+    state.upon(nameOfInput, state, [outputThatMatches])
+        """
+        vars = {'self': self}
+        vars.update(globals())
+        exec(test_body, vars, locals())
 
 
     def test_multipleInitialStatesFailure(self):
@@ -357,6 +444,7 @@ class MethodicalTests(TestCase):
             start.upon(event, enter=end, outputs=[])
             with self.assertRaises(ValueError):
                 start.upon(event, enter=end, outputs=[])
+
 
     def test_badTransitionForCurrentState(self):
         """
@@ -424,6 +512,7 @@ class MethodicalTests(TestCase):
                 "some-value": 1,
             }
         )
+
 
     def test_restoreState(self):
         """

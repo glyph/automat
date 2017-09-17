@@ -1,5 +1,6 @@
 # -*- test-case-name: automat._test.test_methodical -*-
 
+import collections
 from functools import wraps
 from itertools import count
 
@@ -11,9 +12,67 @@ except ImportError:
     from inspect import getargspec as getArgsSpec
 
 import attr
+import six
 
 from ._core import Transitioner, Automaton
 from ._introspection import preserveName
+
+
+ArgSpec = collections.namedtuple('ArgSpec', ['args', 'varargs', 'varkw',
+                                             'defaults', 'kwonlyargs',
+                                             'kwonlydefaults', 'annotations'])
+
+
+def _getArgSpec(func):
+    """
+    Normalize inspect.ArgSpec across python versions
+    and convert mutable attributes to immutable types.
+
+    :param Callable func: A function.
+    :return: The function's ArgSpec.
+    :rtype: ArgSpec
+    """
+    spec = getArgsSpec(func)
+    if six.PY3:
+        return ArgSpec(
+            args=tuple(spec.args),
+            varargs=spec.varargs,
+            varkw=spec.varkw,
+            defaults=spec.defaults if spec.defaults else tuple(),
+            kwonlyargs=tuple(spec.kwonlyargs),
+            kwonlydefaults=tuple(spec.kwonlydefaults.items())
+                           if spec.kwonlydefaults else tuple(),
+            annotations=tuple(spec.annotations.items()),
+        )
+    return ArgSpec(
+        args=tuple(spec.args),
+        varargs=spec.varargs,
+        varkw=spec.keywords,
+        defaults=spec.defaults if spec.defaults else tuple(),
+        kwonlyargs=tuple(),
+        kwonlydefaults=tuple(),
+        annotations=tuple(),
+    )
+
+
+def _getArgNames(spec):
+    """
+    Get the name of all arguments defined in a function signature.
+
+    The name of * and ** arguments is normalized to "*args" and "**kwargs".
+
+    :param ArgSpec spec: A function to interrogate for a signature.
+    :return: The set of all argument names in `func`s signature.
+    :rtype: Set[str]
+    """
+    return set(
+        spec.args
+        + spec.kwonlyargs
+        + (('*args',) if spec.varargs else tuple())
+        + (('**kwargs',) if spec.varkw else tuple())
+        + spec.annotations
+    )
+
 
 def _keywords_only(f):
     """
@@ -46,18 +105,18 @@ class MethodicalState(object):
         with this L{MethodicalState}: upon the receipt of the input C{input},
         enter the state C{enter}, emitting each output in C{outputs}.
         """
-        inputSpec = getArgsSpec(input.method)
+        inputArgs = _getArgNames(input.argSpec)
         for output in outputs:
-            outputSpec = getArgsSpec(output.method)
-            if inputSpec != outputSpec:
+            outputArgs = _getArgNames(output.argSpec)
+            if not outputArgs.issubset(inputArgs):
                 raise TypeError(
                     "method {input} signature {inputSignature} "
                     "does not match output {output} "
                     "signature {outputSignature}".format(
                         input=input.method.__name__,
                         output=output.method.__name__,
-                        inputSignature=inputSpec,
-                        outputSignature=outputSpec,
+                        inputSignature=getArgsSpec(input.method),
+                        outputSignature=getArgsSpec(output.method),
                 ))
         self.machine._oneTransition(self, input, enter, outputs, collector)
 
@@ -102,6 +161,46 @@ def assertNoCode(inst, attribute, f):
         raise ValueError("function body must be empty")
 
 
+def _filterArgs(args, kwargs, inputSpec, outputSpec):
+    """
+    Filter out arguments that were passed to input that output won't accept.
+
+    :param tuple args: The *args that input received.
+    :param dict kwargs: The **kwargs that input received.
+    :param ArgSpec inputSpec: The input's arg spec.
+    :param ArgSpec outputSpec: The output's arg spec.
+    :return: The args and kwargs that output will accept.
+    :rtype: Tuple[tuple, dict]
+    """
+    named_args = tuple(zip(inputSpec.args[1:], args))
+    if outputSpec.varargs:
+        # Only return all args if the output accepts *args.
+        return_args = args
+    else:
+        # Filter out arguments that don't appear
+        # in the output's method signature.
+        return_args = [v for n, v in named_args if n in outputSpec.args]
+
+    # Get any of input's default arguments that were not passed.
+    passed_arg_names = tuple(kwargs)
+    for name, value in named_args:
+        passed_arg_names += (name, value)
+    defaults = zip(inputSpec.args[::-1], inputSpec.defaults[::-1])
+    full_kwargs = {n: v for n, v in defaults if n not in passed_arg_names}
+    full_kwargs.update(kwargs)
+
+    if outputSpec.varkw:
+        # Only pass all kwargs if the output method accepts **kwargs.
+        return_kwargs = full_kwargs
+    else:
+        # Filter out names that the output method does not accept.
+        all_accepted_names = outputSpec.args[1:] + outputSpec.kwonlyargs
+        return_kwargs = {n: v for n, v in full_kwargs.items()
+                         if n in all_accepted_names}
+
+    return return_args, return_kwargs
+
+
 @attr.s(cmp=False, hash=False)
 class MethodicalInput(object):
     """
@@ -111,7 +210,11 @@ class MethodicalInput(object):
     method = attr.ib(validator=assertNoCode)
     symbol = attr.ib(repr=False)
     collectors = attr.ib(default=attr.Factory(dict), repr=False)
+    argSpec = attr.ib(init=False, repr=False)
 
+    @argSpec.default
+    def _buildArgSpec(self):
+        return _getArgSpec(self.method)
 
     def __get__(self, oself, type=None):
         """
@@ -132,7 +235,8 @@ class MethodicalInput(object):
             for output in outputs:
                 if outTracer:
                     outTracer(output._name())
-                value = output(oself, *args, **kwargs)
+                a, k = _filterArgs(args, kwargs, self.argSpec, output.argSpec)
+                value = output(oself, *a, **k)
                 values.append(value)
             return collector(values)
         return doInput
@@ -148,6 +252,11 @@ class MethodicalOutput(object):
     """
     machine = attr.ib(repr=False)
     method = attr.ib()
+    argSpec = attr.ib(init=False, repr=False)
+
+    @argSpec.default
+    def _buildArgSpec(self):
+        return _getArgSpec(self.method)
 
     def __get__(self, oself, type=None):
         """
