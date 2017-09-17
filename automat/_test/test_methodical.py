@@ -6,10 +6,10 @@ Tests for the public interface of Automat.
 from functools import reduce
 from unittest import TestCase
 
-import six
-
+from automat._methodical import ArgSpec, _getArgNames, _getArgSpec, _filterArgs
 from .. import MethodicalMachine, NoTransition
 from .. import _methodical
+
 
 class MethodicalTests(TestCase):
     """
@@ -366,42 +366,35 @@ class MethodicalTests(TestCase):
             self.assertIn("outputThatDoesntMatch", str(cm.exception))
 
 
-    def test_inputOutputTypeMismatch(self):
+    def test_getArgNames(self):
         """
-        All the argument lists of the outputs for a given input must match; if
-        one does not the call to C{upon} will raise a C{TypeError}.
+        Type annotations should be included in the set of
         """
-        if six.PY2:
-            self.skipTest('type annotations are python 3 only')
+        spec = ArgSpec(
+            args=('a', 'b'),
+            varargs=None,
+            varkw=None,
+            defaults=None,
+            kwonlyargs=(),
+            kwonlydefaults=None,
+            annotations=(('a', int), ('b', str)),
+        )
+        self.assertEqual(
+            _getArgNames(spec),
+            {'a', 'b', ('a', int), ('b', str)},
+        )
 
-        # Using exec seemed like the simplest way to put type annotations
-        # in a python 2 compatible code base :/
 
-        test_body = """
-class Mechanism(object):
-    m = MethodicalMachine()
-    @m.input()
-    def nameOfInput(self, a: int):
-        "an input"
-    @m.output()
-    def outputThatMatches(self, a: int):
-        "an output that matches"
-    @m.output()
-    def outputThatDoesntMatch(self, a: str):
-        "an output that doesn't match"
-    @m.state()
-    def state(self):
-        "a state"
-    with self.assertRaises(TypeError) as cm:
-        state.upon(nameOfInput, state, [outputThatMatches,
-                                        outputThatDoesntMatch])
-    self.assertIn("nameOfInput", str(cm.exception))
-    self.assertIn("outputThatDoesntMatch", str(cm.exception))
-    state.upon(nameOfInput, state, [outputThatMatches])
+    def test_filterArgs(self):
         """
-        vars = {'self': self}
-        vars.update(globals())
-        exec(test_body, vars, locals())
+        filterArgs() should not filter the `args` parameter
+        if outputSpec accepts `*args`.
+        """
+        inputSpec = _getArgSpec(lambda *args, **kwargs: None)
+        outputSpec = _getArgSpec(lambda *args, **kwargs: None)
+        argsIn = ()
+        argsOut, _ = _filterArgs(argsIn, {}, inputSpec, outputSpec)
+        self.assertIs(argsIn, argsOut)
 
 
     def test_multipleInitialStatesFailure(self):

@@ -33,25 +33,17 @@ def _getArgSpec(func):
     :rtype: ArgSpec
     """
     spec = getArgsSpec(func)
-    if six.PY3:
-        return ArgSpec(
-            args=tuple(spec.args),
-            varargs=spec.varargs,
-            varkw=spec.varkw,
-            defaults=spec.defaults if spec.defaults else tuple(),
-            kwonlyargs=tuple(spec.kwonlyargs),
-            kwonlydefaults=tuple(spec.kwonlydefaults.items())
-                           if spec.kwonlydefaults else tuple(),
-            annotations=tuple(spec.annotations.items()),
-        )
     return ArgSpec(
         args=tuple(spec.args),
         varargs=spec.varargs,
-        varkw=spec.keywords,
-        defaults=spec.defaults if spec.defaults else tuple(),
-        kwonlyargs=tuple(),
-        kwonlydefaults=tuple(),
-        annotations=tuple(),
+        varkw=spec.varkw if six.PY3 else spec.keywords,
+        defaults=spec.defaults if spec.defaults else (),
+        kwonlyargs=tuple(spec.kwonlyargs) if six.PY3 else (),
+        kwonlydefaults=(
+            tuple(spec.kwonlydefaults.items())
+            if spec.kwonlydefaults else ()
+        ) if six.PY3 else (),
+        annotations=tuple(spec.annotations.items()) if six.PY3 else (),
     )
 
 
@@ -68,8 +60,8 @@ def _getArgNames(spec):
     return set(
         spec.args
         + spec.kwonlyargs
-        + (('*args',) if spec.varargs else tuple())
-        + (('**kwargs',) if spec.varkw else tuple())
+        + (('*args',) if spec.varargs else ())
+        + (('**kwargs',) if spec.varkw else ())
         + spec.annotations
     )
 
