@@ -1,7 +1,11 @@
 # -*- test-case-name: automat._test.test_methodical -*-
 
+import itertools
+from collections import defaultdict
 from functools import wraps
 from itertools import count
+
+from automat._core import NoTransition
 
 try:
     # Python 3
@@ -12,7 +16,7 @@ except ImportError:
 
 import attr
 
-from ._core import Transitioner, Automaton
+from ._core import Transitioner
 from ._introspection import preserveName
 
 def _keywords_only(f):
@@ -32,55 +36,37 @@ def _keywords_only(f):
 
 
 @attr.s(frozen=True)
-class MethodicalState(object):
+class MethodicalFlag(object):
     """
     A state for a L{MethodicalMachine}.
+
+    :ivar tuple states:
     """
-    machine = attr.ib(repr=False)
+    states = attr.ib(convert=tuple)
     method = attr.ib()
     serialized = attr.ib(repr=False)
 
-    def upon(self, input, enter, outputs, collector=list):
-        """
-        Declare a state transition within the :class:`automat.MethodicalMachine`
-        associated with this :class:`automat.MethodicalState`:
-        upon the receipt of the `input`, enter the `state`,
-        emitting each output in `outputs`.
-
-        :param MethodicalInput input: The input triggering a state transition.
-        :param MethodicalState enter: The resulting state.
-        :param Iterable[MethodicalOutput] outputs: The outputs to be triggered
-            as a result of the declared state transition.
-        :param Callable collector: The function to be used when collecting
-            output return values.
-
-        :raises TypeError: if any of the `outputs` signatures do not match
-            the `inputs` signature.
-        :raises ValueError: if the state transition from `self` via `input`
-            has already been defined.
-        """
-        inputSpec = getArgsSpec(input.method)
-        for output in outputs:
-            outputSpec = getArgsSpec(output.method)
-            if inputSpec != outputSpec:
-                raise TypeError(
-                    "method {input} signature {inputSignature} "
-                    "does not match output {output} "
-                    "signature {outputSignature}".format(
-                        input=input.method.__name__,
-                        output=output.method.__name__,
-                        inputSignature=inputSpec,
-                        outputSignature=outputSpec,
-                ))
-        self.machine._oneTransition(self, input, enter, outputs, collector)
-
     def _name(self):
         return self.method.__name__
+
+    def _serialized(self):
+        """
+        Get the serialized reprisentation of the flag's name.
+
+        :rtype: str
+        """
+        return self.serialized if self.serialized else self._name()
 
 
 def _transitionerFromInstance(oself, symbol, automaton):
     """
     Get a L{Transitioner}
+
+    :param oself: An instance of the class
+        that the MethodicalMachine belongs to.
+    :param str symbol:
+    :param Automation automaton:
+    :rtype: Transitioner
     """
     transitioner = getattr(oself, symbol, None)
     if transitioner is None:
@@ -119,35 +105,48 @@ def assertNoCode(inst, attribute, f):
 class MethodicalInput(object):
     """
     An input for a L{MethodicalMachine}.
+
+    :ivar dict collectors:
     """
-    automaton = attr.ib(repr=False)
-    method = attr.ib(validator=assertNoCode)
+    _machine = attr.ib(repr=False)  # type: MethodicalMachine
+    method = attr.ib(validator=assertNoCode)  # type: Callable
     symbol = attr.ib(repr=False)
-    collectors = attr.ib(default=attr.Factory(dict), repr=False)
+    _transitions = (  # type: Dict[State, Tuple[State, Outputs, Coloector]]
+        attr.ib(default=attr.Factory(dict), repr=False)
+    )
 
+    def _transition(self, instance):
+        """
+        Transition the state of `instance`
+        and get the corresponding outputs and collector.
 
-    def __get__(self, oself, type=None):
+        :type instance: Any
+        :param instance: The instance on which the MethodicalInput was called.
+        :rtype: Tuple[tuple, Callable]
+        :return: The outputs, collector pair.
+        """
+        key = id(instance)
+        old_state = self._machine._instance_states[key]
+        try:
+            new_state, outputs, collector = self._transitions[old_state]
+        except KeyError:
+            raise NoTransition(state=old_state, symbol=self)
+        self._machine._instance_states[key] = new_state
+        return outputs, collector
+
+    def __get__(self, instance, type=None):
         """
         Return a function that takes no arguments and returns values returned
         by output functions produced by the given L{MethodicalInput} in
-        C{oself}'s current state.
+        C{instance}'s current state.
         """
-        transitioner = _transitionerFromInstance(oself, self.symbol,
-                                                 self.automaton)
         @preserveName(self.method)
         @wraps(self.method)
         def doInput(*args, **kwargs):
-            self.method(oself, *args, **kwargs)
-            previousState = transitioner._state
-            (outputs, outTracer) = transitioner.transition(self)
-            collector = self.collectors[previousState]
-            values = []
-            for output in outputs:
-                if outTracer:
-                    outTracer(output._name())
-                value = output(oself, *args, **kwargs)
-                values.append(value)
-            return collector(values)
+            self.method(instance, *args, **kwargs)
+            outputs, collector = self._transition(instance)
+            results = [o(instance, *args, **kwargs) for o in outputs]
+            return collector(results)
         return doInput
 
     def _name(self):
@@ -215,9 +214,16 @@ class MethodicalMachine(object):
     """
 
     def __init__(self):
-        self._automaton = Automaton()
-        self._reducers = {}
+        self._flags = []
         self._symbol = gensym()
+        self._initial_state = {}
+        self._instance_states = defaultdict(self._get_initial_state)
+        self._serialization_map = {}
+        self._has_transitions = False
+
+
+    def _get_initial_state(self):
+        return frozenset(self._initial_state.items())
 
 
     def __get__(self, oself, type=None):
@@ -233,34 +239,36 @@ class MethodicalMachine(object):
 
 
     @_keywords_only
-    def state(self, initial=False, terminal=False,
-              serialized=None):
+    def flag(self, states, initial, serialized=None):
         """
         Declare a state, possibly an initial state or a terminal state.
 
         This is a decorator for methods, but it will modify the method so as
         not to be callable any more.
 
-        :param bool initial: is this state the initial state?
-            Only one state on this :class:`automat.MethodicalMachine`
-            may be an initial state; more than one is an error.
+        :param initial: is this state the initial state?  Only one state on
+            this :class:`automat.MethodicalMachine` may be an initial state; more than one is
+            an error.
 
-        :param bool terminal: Is this state a terminal state?
-            i.e. a state that the machine can end up in?
-            (This is purely informational at this point.)
-
-        :param Hashable serialized: a serializable value
-            to be used to represent this state to external systems.
-            This value should be hashable;
-            :py:func:`unicode` is a good type to use.
+        @param serialized: a serializable value to be used to represent this
+            state to external systems.  This value should be hashable;
+            L{unicode} is a good type to use.
+        @type serialized: a hashable (comparable) value
+        :param states:
         """
-        def decorator(stateMethod):
-            state = MethodicalState(machine=self,
-                                    method=stateMethod,
-                                    serialized=serialized)
-            if initial:
-                self._automaton.initialState = state
-            return state
+        if self._has_transitions:
+            raise RuntimeError('Flags may not be added after transitions.')
+
+        def decorator(flagMethod):
+            flag = MethodicalFlag(
+                method=flagMethod,
+                serialized=serialized,
+                states=states,
+            )
+            self._flags.append(flag)
+            self._initial_state[flag._name()] = initial
+            self._serialization_map[flag._name()] = flag._serialized()
+            return flag
         return decorator
 
 
@@ -272,7 +280,7 @@ class MethodicalMachine(object):
         This is a decorator for methods.
         """
         def decorator(inputMethod):
-            return MethodicalInput(automaton=self._automaton,
+            return MethodicalInput(machine=self,
                                    method=inputMethod,
                                    symbol=self._symbol)
         return decorator
@@ -293,29 +301,77 @@ class MethodicalMachine(object):
         return decorator
 
 
-    def _oneTransition(self, startState, inputToken, endState, outputTokens,
-                       collector):
-        """
-        See L{MethodicalState.upon}.
-        """
-        # FIXME: tests for all of this (some of it is wrong)
-        # if not isinstance(startState, MethodicalState):
-        #     raise NotImplementedError("start state {} isn't a state"
-        #                               .format(startState))
-        # if not isinstance(inputToken, MethodicalInput):
-        #     raise NotImplementedError("start state {} isn't an input"
-        #                               .format(inputToken))
-        # if not isinstance(endState, MethodicalState):
-        #     raise NotImplementedError("end state {} isn't a state"
-        #                               .format(startState))
-        # for output in outputTokens:
-        #     if not isinstance(endState, MethodicalState):
-        #         raise NotImplementedError("output state {} isn't a state"
-        #                                   .format(endState))
-        self._automaton.addTransition(startState, inputToken, endState,
-                                      tuple(outputTokens))
-        inputToken.collectors[startState] = collector
+    def _possible_states(self):
+        """ Iterate over all possible flag combinations. """
+        flag_names = [f._name() for f in self._flags]
+        flag_states = [f.states for f in self._flags]
+        for combo in itertools.product(*flag_states):
+            yield frozenset(zip(flag_names, combo))
 
+    def _validate_signatures(self, input, outputs):
+        """
+        Check that all of the output signatures match the input signature.
+
+        :param MethodicalInput input:
+        :param Iterable[MethodicalOutput] outputs:
+        :raises: TypeError if there is a miss match.
+        """
+        inputSpec = getArgsSpec(input.method)
+        for output in outputs:
+            outputSpec = getArgsSpec(output.method)
+            if inputSpec != outputSpec:
+                raise TypeError(
+                    "method {input} signature {inputSignature} "
+                    "does not match output {output} "
+                    "signature {outputSignature}".format(
+                        input=input.method.__name__,
+                        output=output.method.__name__,
+                        inputSignature=inputSpec,
+                        outputSignature=outputSpec,
+                    )
+                )
+
+    def _check_that_transition_is_unique(self, from_states, input):
+        """
+
+        :param List[frozenset] from_states: A list of all flag combinations,
+            that input will transition from.
+        :param MethodicalInput input:
+        :raises ValueError: If any of the from states are already registered.
+        """
+        for state in from_states:
+            if state in input._transitions:
+                raise ValueError(
+                    "already have transition from {} via {}"
+                    .format(state, input._name())
+                )
+
+    def transition(self, from_, to, input, outputs, collector=list):
+        """
+        Declare a state transition from one state to another
+        when an input is called triggering certain outputs.
+
+        :param dict from_: The state to transition from.
+        :param dict to: The state to transition to.
+        :param MethodicalInput input: The input that triggers the transition.
+        :param List[MethodicalOutput] outputs: The outputs that are called
+            when the transition occurs.
+        :param Optional[Callable] collector: A function to collect
+            the return values of all the outputs.
+        """
+        self._has_transitions = True
+
+        self._validate_signatures(input, outputs)
+
+        from_set = frozenset(from_.items())
+        from_states = [s for s in self._possible_states()
+                       if s.issuperset(from_set)]
+
+        self._check_that_transition_is_unique(from_states, input)
+
+        to_set = frozenset(to.items())
+        for state in from_states:
+            input._transitions[state] = (to_set, outputs, collector)
 
     @_keywords_only
     def serializer(self):
@@ -350,9 +406,9 @@ class MethodicalMachine(object):
             return unserialize
         return decorator
 
-    @property
-    def _setTrace(self):
-        return MethodicalTracer(self._automaton, self._symbol)
+    # @property
+    # def _setTrace(self):
+    #     return MethodicalTracer(self._automaton, self._symbol)
 
     def asDigraph(self):
         """

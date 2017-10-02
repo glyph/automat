@@ -43,10 +43,10 @@ def sampleMachine():
     """
     mm = MethodicalMachine()
     class SampleObject(object):
-        @mm.state(initial=True)
+        @mm.flag(states=[], initial=True)
         def begin(self):
             "initial state"
-        @mm.state()
+        @mm.flag(states=[], initial='?')
         def end(self):
             "end state"
         @mm.input()

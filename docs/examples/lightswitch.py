@@ -6,10 +6,10 @@ from automat import MethodicalMachine
 class LightSwitch(object):
     machine = MethodicalMachine()
 
-    @machine.state(serialized="on")
+    @machine.flag([], '?', serialized="on")
     def on_state(self):
         "the switch is on"
-    @machine.state(serialized="off", initial=True)
+    @machine.flag([], initial=True, serialized="off")
     def off_state(self):
         "the switch is off"
     @machine.input()

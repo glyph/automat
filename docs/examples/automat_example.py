@@ -31,7 +31,7 @@ class FoodSlot(object):
         self._light = light
         self.start()
 
-    @machine.state(initial=True)
+    @machine.flag([], initial=True)
     def initial(self):
         """
         The initial state when we are constructed.
@@ -40,7 +40,7 @@ class FoodSlot(object):
         provides an input to transition out of it immediately.
         """
 
-    @machine.state()
+    @machine.flag([], '?')
     def empty(self):
         """
         The machine is empty (and the light asking for food is on).
@@ -53,13 +53,13 @@ class FoodSlot(object):
         'empty', making sure the door and light are properly configured.
         """
 
-    @machine.state()
+    @machine.flag([], '?')
     def ready(self):
         """
         We've got some food and we're ready to serve it.
         """
 
-    @machine.state()
+    @machine.flag([], '?')
     def serving(self):
         """
         The door is open, we're serving food.

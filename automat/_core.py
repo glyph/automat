@@ -8,7 +8,7 @@ Perhaps something that could be replaced with or integrated into machinist.
 
 from itertools import chain
 
-_NO_STATE = "<no state>"
+import itertools
 
 
 class NoTransition(Exception):
@@ -40,7 +40,8 @@ class Automaton(object):
         """
         Initialize the set of transitions and the initial state.
         """
-        self._initialState = _NO_STATE
+        self.flags = []
+        self._initialState = {}
         self._transitions = set()
 
 
@@ -52,30 +53,32 @@ class Automaton(object):
         return self._initialState
 
 
-    @initialState.setter
-    def initialState(self, state):
-        """
-        Set this automaton's initial state.  Raises a ValueError if
-        this automaton already has an initial state.
-        """
-
-        if self._initialState is not _NO_STATE:
-            raise ValueError(
-                "initial state already set to {}".format(self._initialState))
-
-        self._initialState = state
+    def _possibleStates(self):
+        names = [f._name for f in self.flags]
+        values = [f.options for f in self.flags]
+        for values in itertools.product(*values):
+            yield zip(names, values)
 
 
     def addTransition(self, inState, inputSymbol, outState, outputSymbols):
         """
         Add the given transition to the outputSymbol. Raise ValueError if
         there is already a transition with the same inState and inputSymbol.
+
+        :param frozenset inState:
+        :param MethodicalInput inputSymbol:
+        :param frozenset outState:
+        :param Tuple[MethodicalOutputs] outputSymbols:
         """
         # keeping self._transitions in a flat list makes addTransition
         # O(n^2), but state machines don't tend to have hundreds of
         # transitions.
         for (anInState, anInputSymbol, anOutState, _) in self._transitions:
-            if (anInState == inState and anInputSymbol == inputSymbol):
+            stateOverlap = (
+                inState.issubset(anInState) or
+                anInState.issubset(inState)
+            )
+            if stateOverlap and anInputSymbol == inputSymbol:
                 raise ValueError(
                     "already have transition from {} via {}".format(inState, inputSymbol))
         self._transitions.add(
@@ -113,8 +116,8 @@ class Automaton(object):
 
     def states(self):
         """
-        All valid states; "Q" in the mathematical description of a state
-        machine.
+        All valid states;
+        "Q" in the mathematical description of a state machine.
         """
         return frozenset(
             chain.from_iterable(
@@ -126,15 +129,22 @@ class Automaton(object):
         )
 
 
-    def outputForInput(self, inState, inputSymbol):
+    def outputForInput(self, currentState, inputSymbol):
         """
-        A 2-tuple of (outState, outputSymbols) for inputSymbol.
+        Find the ending state and outputs
+        that correspond to the given starting state and input.
+
+        :param MethodicalFlag currentState: The current state of the machine.
+        :param MethodicalInput inputSymbol:
+        :rtype: Tuple[?, List[MethodicalOutput]]
+        :raises NoTransition: if there is no match
+            for the starting state and input pare.
         """
-        for (anInState, anInputSymbol,
-             outState, outputSymbols) in self._transitions:
-            if (inState, inputSymbol) == (anInState, anInputSymbol):
+        for (anInState, anInputSymbol, outState, outputSymbols) in self._transitions:
+            matchingState = anInState.issubset(currentState)
+            if matchingState and inputSymbol == anInputSymbol:
                 return (outState, list(outputSymbols))
-        raise NoTransition(state=inState, symbol=inputSymbol)
+        raise NoTransition(state=currentState, symbol=inputSymbol)
 
 
 class Transitioner(object):
@@ -153,6 +163,9 @@ class Transitioner(object):
     def transition(self, inputSymbol):
         """
         Transition between states, returning any outputs.
+
+        :param MethodicalInput inputSymbol:
+        :rtype: Tuple[?, Optional[?]]
         """
         outState, outputSymbols = self._automaton.outputForInput(self._state,
                                                                  inputSymbol)

@@ -26,11 +26,11 @@ class Turnstile(object):
     def _nope(self):
         print("**Clunk!**  The turnstile doesn't move.")
 
-    @machine.state(initial=True)
+    @machine.flag([], initial=True)
     def _locked(self):
         "The turnstile is locked."
 
-    @machine.state()
+    @machine.flag([], '?')
     def _unlocked(self):
         "The turnstile is unlocked."
 

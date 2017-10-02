@@ -9,10 +9,10 @@ class CoffeeBrewer(object):
     def _heat_the_heating_element(self):
         "Heat up the heating element, which should cause coffee to happen."
         # self._heating_element.turn_on()
-    @_machine.state()
+    @_machine.flag([], '?')
     def have_beans(self):
         "In this state, you have some beans."
-    @_machine.state(initial=True)
+    @_machine.flag([], initial=True)
     def dont_have_beans(self):
         "In this state, you don't have any beans."
     @_machine.input()

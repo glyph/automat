@@ -22,7 +22,7 @@ class SampleObject(object):
     def out(self):
         "sample output"
 
-    setTrace = mm._setTrace
+    # setTrace = mm._setTrace
 
     mm.transition({'state': 'begin'}, {'state': 'middle'}, go1, [out])
     mm.transition({'state': 'middle'}, {'state': 'end'}, go2, [out])

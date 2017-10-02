@@ -12,7 +12,7 @@ class Simple(object):
     def one(self, data):
         "some input data"
 
-    @_m.state(initial=True)
+    @_m.flag([], initial=True)
     def waiting(self):
         "patiently"
 
