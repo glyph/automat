@@ -5,7 +5,9 @@ from collections import defaultdict
 from functools import wraps
 from itertools import count
 
-from automat._core import NoTransition
+import attr
+
+from ._introspection import preserveName
 
 try:
     # Python 3
@@ -14,12 +16,8 @@ except ImportError:
     # Python 2
     from inspect import getargspec as getArgsSpec
 
-import attr
 
-from ._core import Transitioner
-from ._introspection import preserveName
-
-def _keywords_only(f):
+def _keywordsOnly(f):
     """
     Decorate a function so all its arguments must be passed by keyword.
 
@@ -35,54 +33,59 @@ def _keywords_only(f):
     return g
 
 
+class NoTransition(Exception):
+    """
+    A finite state machine in C{state} has no transition for C{symbol}.
+
+    @param state: the finite state machine's state at the time of the
+        illegal transition.
+
+    @param symbol: the input symbol for which no transition exists.
+    """
+
+    def __init__(self, state, symbol):
+        self.state = state
+        self.symbol = symbol
+        super(Exception, self).__init__(
+            "no transition for {} in {}".format(symbol, state)
+        )
+
+
 @attr.s(frozen=True)
 class MethodicalFlag(object):
     """
     A state for a L{MethodicalMachine}.
 
-    :ivar tuple states:
+    :ivar tuple _states:
     """
-    states = attr.ib(convert=tuple)
-    method = attr.ib()
-    serialized = attr.ib(repr=False)
+    _states = attr.ib(convert=tuple)
+    _method = attr.ib()
+    _serialized = attr.ib(repr=False)
 
     def _name(self):
-        return self.method.__name__
-
-    def _serialized(self):
         """
-        Get the serialized reprisentation of the flag's name.
+        Get the flag's method name.
 
         :rtype: str
         """
-        return self.serialized if self.serialized else self._name()
+        return self._method.__name__
 
+    def _serializedName(self):
+        """
+        Get the serialized representation of the flag's name.
 
-def _transitionerFromInstance(oself, symbol, automaton):
-    """
-    Get a L{Transitioner}
-
-    :param oself: An instance of the class
-        that the MethodicalMachine belongs to.
-    :param str symbol:
-    :param Automation automaton:
-    :rtype: Transitioner
-    """
-    transitioner = getattr(oself, symbol, None)
-    if transitioner is None:
-        transitioner = Transitioner(
-            automaton,
-            automaton.initialState,
-        )
-        setattr(oself, symbol, transitioner)
-    return transitioner
+        :rtype: str
+        """
+        return self._serialized if self._serialized else self._name()
 
 
 def _empty():
     pass
 
+
 def _docstring():
     """docstring"""
+
 
 def assertNoCode(inst, attribute, f):
     # The function body must be empty, i.e. "pass" or "return None", which
@@ -109,11 +112,14 @@ class MethodicalInput(object):
     :ivar dict collectors:
     """
     _machine = attr.ib(repr=False)  # type: MethodicalMachine
-    method = attr.ib(validator=assertNoCode)  # type: Callable
+    _method = attr.ib(validator=assertNoCode)  # type: Callable
     symbol = attr.ib(repr=False)
     _transitions = (  # type: Dict[State, Tuple[State, Outputs, Coloector]]
         attr.ib(default=attr.Factory(dict), repr=False)
     )
+
+    def _name(self):
+        return self._method.__name__
 
     def _transition(self, instance):
         """
@@ -126,18 +132,18 @@ class MethodicalInput(object):
         :return: The outputs, out_tracer and collector.
         """
         id_ = id(instance)
-        old_state = self._machine._instance_states[id_]
+        old_state = self._machine._instanceStates[id_]
         try:
             new_state, outputs, collector = self._transitions[old_state]
         except KeyError:
             raise NoTransition(state=old_state, symbol=self)
-        self._machine._instance_states[id_] = new_state
+        self._machine._instanceStates[id_] = new_state
 
         def dummy_tracer(*args, **kwargs):
             """ This is a dummy traccer. """
 
         out_tracer = dummy_tracer
-        in_tracer = self._machine._instance_tracers.get(id_, dummy_tracer)
+        in_tracer = self._machine._instanceTracers.get(id_, dummy_tracer)
         if in_tracer:
             out_tracer = in_tracer(dict(old_state), self._name(), dict(new_state))
 
@@ -149,19 +155,19 @@ class MethodicalInput(object):
         by output functions produced by the given L{MethodicalInput} in
         C{instance}'s current state.
         """
-        @preserveName(self.method)
-        @wraps(self.method)
+        @preserveName(self._method)
+        @wraps(self._method)
         def doInput(*args, **kwargs):
-            self.method(instance, *args, **kwargs)
+            # Check that function was called with the correct signature.
+            self._method(instance, *args, **kwargs)
+
             outputs, out_tracer, collector = self._transition(instance)
             for output in outputs:
                 out_tracer(output._name())
             results = [o(instance, *args, **kwargs) for o in outputs]
             return collector(results)
-        return doInput
 
-    def _name(self):
-        return self.method.__name__
+        return doInput
 
 
 @attr.s(frozen=True)
@@ -169,8 +175,10 @@ class MethodicalOutput(object):
     """
     An output for a L{MethodicalMachine}.
     """
-    machine = attr.ib(repr=False)
-    method = attr.ib()
+    _method = attr.ib()
+
+    def _name(self):
+        return self._method.__name__
 
     def __get__(self, oself, type=None):
         """
@@ -180,19 +188,16 @@ class MethodicalOutput(object):
             "{cls}.{method} is a state-machine output method; "
             "to produce this output, call an input method instead.".format(
                 cls=type.__name__,
-                method=self.method.__name__
+                method=self._name()
             )
         )
-
 
     def __call__(self, oself, *args, **kwargs):
         """
         Call the underlying method.
         """
-        return self.method(oself, *args, **kwargs)
+        return self._method(oself, *args, **kwargs)
 
-    def _name(self):
-        return self.method.__name__
 
 @attr.s(cmp=False, hash=False)
 class MethodicalTracer(object):
@@ -201,13 +206,14 @@ class MethodicalTracer(object):
     def __get__(self, oself, type=None):
 
         def setTrace(tracer):
-            self.machine._instance_tracers[id(oself)] = tracer
+            self.machine._instanceTracers[id(oself)] = tracer
 
         return setTrace
 
 
-
 counter = count()
+
+
 def gensym():
     """
     Create a unique Python identifier.
@@ -215,31 +221,32 @@ def gensym():
     return "_symbol_" + str(next(counter))
 
 
-
+@attr.s()
 class MethodicalMachine(object):
     """
     A :class:`MethodicalMachine` is an interface to an `Automaton`
     that uses methods on a class.
     """
 
-    def __init__(self):
-        self._flags = []
-        self._symbol = gensym()
-        self._initial_state = {}
-        self._instance_tracers = {}
-        self._instance_states = defaultdict(self._get_initial_state)
-        self._serialization_map = {}
-        self._has_transitions = False
+    _flags = attr.ib(default=attr.Factory(list))
+    _symbol = attr.ib(default=attr.Factory(gensym))
+    _initialState = attr.ib(default=attr.Factory(dict))
+    _instanceTracers = attr.ib(default=attr.Factory(dict))
+    _instanceStates = attr.ib()
+    _serializationMap = attr.ib(default=attr.Factory(dict))
+    _hasTransitions = attr.ib(default=False)
+
+    def _getInitialState(self):
+        return frozenset(self._initialState.items())
+
+    @_instanceStates.default
+    def _newInstanceStates(self):
+        return defaultdict(self._getInitialState)
 
     @property
-    def _unserialization_map(self):
+    def _unserializationMap(self):
         """ Mapping of serialized flag names to unserialized flag names. """
-        return {val: key for key, val in self._serialization_map.items()}
-
-
-    def _get_initial_state(self):
-        return frozenset(self._initial_state.items())
-
+        return {val: key for key, val in self._serializationMap.items()}
 
     def __get__(self, oself, type=None):
         """
@@ -252,8 +259,7 @@ class MethodicalMachine(object):
                 "MethodicalMachine is an implementation detail.")
         return self
 
-
-    @_keywords_only
+    @_keywordsOnly
     def flag(self, states, initial, serialized=None):
         """
         Declare a state, possibly an initial state or a terminal state.
@@ -271,7 +277,7 @@ class MethodicalMachine(object):
         @type serialized: a hashable (comparable) value
         :param states:
         """
-        if self._has_transitions:
+        if self._hasTransitions:
             raise RuntimeError('Flags may not be added after transitions.')
 
         def decorator(flagMethod):
@@ -281,13 +287,12 @@ class MethodicalMachine(object):
                 states=states,
             )
             self._flags.append(flag)
-            self._initial_state[flag._name()] = initial
-            self._serialization_map[flag._name()] = flag._serialized()
+            self._initialState[flag._name()] = initial
+            self._serializationMap[flag._name()] = flag._serializedName()
             return flag
         return decorator
 
-
-    @_keywords_only
+    @_keywordsOnly
     def input(self):
         """
         Declare an input.
@@ -300,8 +305,7 @@ class MethodicalMachine(object):
                                    symbol=self._symbol)
         return decorator
 
-
-    @_keywords_only
+    @_keywordsOnly
     def output(self):
         """
         Declare an output.
@@ -312,18 +316,17 @@ class MethodicalMachine(object):
         state as specified in the decorated `output` method.
         """
         def decorator(outputMethod):
-            return MethodicalOutput(machine=self, method=outputMethod)
+            return MethodicalOutput(method=outputMethod)
         return decorator
 
-
-    def _possible_states(self):
+    def _possibleStates(self):
         """ Iterate over all possible flag combinations. """
         flag_names = [f._name() for f in self._flags]
-        flag_states = [f.states for f in self._flags]
+        flag_states = [f._states for f in self._flags]
         for combo in itertools.product(*flag_states):
             yield frozenset(zip(flag_names, combo))
 
-    def _validate_signatures(self, input, outputs):
+    def _validateSignatures(self, input, outputs):
         """
         Check that all of the output signatures match the input signature.
 
@@ -331,22 +334,22 @@ class MethodicalMachine(object):
         :param Iterable[MethodicalOutput] outputs:
         :raises: TypeError if there is a miss match.
         """
-        inputSpec = getArgsSpec(input.method)
+        inputSpec = getArgsSpec(input._method)
         for output in outputs:
-            outputSpec = getArgsSpec(output.method)
+            outputSpec = getArgsSpec(output._method)
             if inputSpec != outputSpec:
                 raise TypeError(
                     "method {input} signature {inputSignature} "
                     "does not match output {output} "
                     "signature {outputSignature}".format(
-                        input=input.method.__name__,
-                        output=output.method.__name__,
+                        input=input._method.__name__,
+                        output=output._method.__name__,
                         inputSignature=inputSpec,
                         outputSignature=outputSpec,
                     )
                 )
 
-    def _check_that_transition_is_unique(self, from_states, input):
+    def _checkThatTransitionIsUnique(self, from_states, input):
         """
 
         :param List[frozenset] from_states: A list of all flag combinations,
@@ -374,15 +377,15 @@ class MethodicalMachine(object):
         :param Optional[Callable] collector: A function to collect
             the return values of all the outputs.
         """
-        self._has_transitions = True
+        self._hasTransitions = True
 
-        self._validate_signatures(input, outputs)
+        self._validateSignatures(input, outputs)
 
         from_set = frozenset(from_.items())
-        from_states = [s for s in self._possible_states()
+        from_states = [s for s in self._possibleStates()
                        if s.issuperset(from_set)]
 
-        self._check_that_transition_is_unique(from_states, input)
+        self._checkThatTransitionIsUnique(from_states, input)
 
         to_set = frozenset(to.items())
         for state in from_states:
@@ -397,11 +400,10 @@ class MethodicalMachine(object):
         :rtype: Dict[str, Any]
         :returns: The serialized state of `obj`.
         """
-        mapping = self._serialization_map
+        mapping = self._serializationMap
         return {mapping[flag_name]: value for flag_name, value in state}
 
-
-    @_keywords_only
+    @_keywordsOnly
     def serializer(self):
         """
 
@@ -409,7 +411,7 @@ class MethodicalMachine(object):
         def decorator(func):
             @wraps(func)
             def serialize(oself):
-                state = self._instance_states[id(oself)]
+                state = self._instanceStates[id(oself)]
                 return func(oself, self._serialize(state))
             return serialize
         return decorator
@@ -423,10 +425,10 @@ class MethodicalMachine(object):
         :rtype: frozenset
         :returns: The internal state representation.
         """
-        mapping = self._unserialization_map
+        mapping = self._unserializationMap
         return frozenset((mapping[key], val) for key, val in state.items())
 
-    @_keywords_only
+    @_keywordsOnly
     def unserializer(self):
         """
 
@@ -436,7 +438,7 @@ class MethodicalMachine(object):
             def unserialize(oself, *args, **kwargs):
                 serialized_state = func(oself, *args, **kwargs)
                 state = self._unserialize(serialized_state)
-                self._instance_states[id(oself)] = state
+                self._instanceStates[id(oself)] = state
                 return None  # it's on purpose
             return unserialize
         return decorator

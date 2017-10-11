@@ -2,7 +2,6 @@
 """
 Tests for the public interface of Automat.
 """
-import pdb
 from functools import reduce
 from unittest import TestCase
 
@@ -227,7 +226,7 @@ class MethodicalTests(TestCase):
         # input functions are executed to assert that the signature matches,
         # but their body must be empty
 
-        _methodical._empty() # chase coverage
+        _methodical._empty()  # chase coverage
         _methodical._docstring()
 
         class Mechanism(object):
@@ -491,7 +490,6 @@ class MethodicalTests(TestCase):
                 'some-value': 2,
             }
         )
-
 
 
 # FIXME: error for wrong types on any call to _oneTransition

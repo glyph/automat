@@ -1,6 +1,5 @@
 # -*- test-case-name: automat -*-
-from ._methodical import MethodicalMachine
-from ._core import NoTransition
+from ._methodical import MethodicalMachine, NoTransition
 
 __all__ = [
     'MethodicalMachine',
