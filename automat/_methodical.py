@@ -221,6 +221,11 @@ class MethodicalMachine(object):
         self._serialization_map = {}
         self._has_transitions = False
 
+    @property
+    def _unserialization_map(self):
+        """ Mapping of serialized flag names to unserialized flag names. """
+        return {val: key for key, val in self._serialization_map.items()}
+
 
     def _get_initial_state(self):
         return frozenset(self._initial_state.items())
@@ -373,36 +378,56 @@ class MethodicalMachine(object):
         for state in from_states:
             input._transitions[state] = (to_set, outputs, collector)
 
+    def _serialize(self, state):
+        """
+        Convert an unserialized state into it's serialized representation.
+
+        :param frozenset state: The instance of a class
+            with a :py:class:`MethodicalMachine` attribute.
+        :rtype: Dict[str, Any]
+        :returns: The serialized state of `obj`.
+        """
+        mapping = self._serialization_map
+        return {mapping[flag_name]: value for flag_name, value in state}
+
+
     @_keywords_only
     def serializer(self):
         """
 
         """
-        def decorator(decoratee):
-            @wraps(decoratee)
+        def decorator(func):
+            @wraps(func)
             def serialize(oself):
-                transitioner = _transitionerFromInstance(oself, self._symbol,
-                                                         self._automaton)
-                return decoratee(oself, transitioner._state.serialized)
+                state = self._instance_states[id(oself)]
+                return func(oself, self._serialize(state))
             return serialize
         return decorator
+
+    def _unserialize(self, state):
+        """
+        Reconstruct the state of a mechanized object
+        from it's serialized representation.
+
+        :param Dict[str, Any] state: The state to reconstruct.
+        :rtype: frozenset
+        :returns: The internal state representation.
+        """
+        mapping = self._unserialization_map
+        return frozenset((mapping[key], val) for key, val in state.items())
 
     @_keywords_only
     def unserializer(self):
         """
 
         """
-        def decorator(decoratee):
-            @wraps(decoratee)
+        def decorator(func):
+            @wraps(func)
             def unserialize(oself, *args, **kwargs):
-                state = decoratee(oself, *args, **kwargs)
-                mapping = {}
-                for eachState in self._automaton.states():
-                    mapping[eachState.serialized] = eachState
-                transitioner = _transitionerFromInstance(
-                    oself, self._symbol, self._automaton)
-                transitioner._state = mapping[state]
-                return None # it's on purpose
+                serialized_state = func(oself, *args, **kwargs)
+                state = self._unserialize(serialized_state)
+                self._instance_states[id(oself)] = state
+                return None  # it's on purpose
             return unserialize
         return decorator
 

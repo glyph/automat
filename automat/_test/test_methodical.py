@@ -487,7 +487,7 @@ class MethodicalTests(TestCase):
         self.assertEqual(
             m2.save(),
             {
-                'machine-state': {'first': 'on', 'second': 2},
+                'machine-state': {'First': 'on', 'Second': 2},
                 'some-value': 2,
             }
         )
