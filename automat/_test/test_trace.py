@@ -1,6 +1,7 @@
 from unittest import TestCase
 from .._methodical import MethodicalMachine
 
+
 class SampleObject(object):
     mm = MethodicalMachine()
 
@@ -11,9 +12,11 @@ class SampleObject(object):
     @mm.input()
     def go1(self):
         "sample input"
+
     @mm.input()
     def go2(self):
         "sample input"
+
     @mm.input()
     def back(self):
         "sample input"
@@ -22,19 +25,21 @@ class SampleObject(object):
     def out(self):
         "sample output"
 
-    # setTrace = mm._setTrace
+    setTrace = mm._setTrace
 
     mm.transition({'state': 'begin'}, {'state': 'middle'}, go1, [out])
     mm.transition({'state': 'middle'}, {'state': 'end'}, go2, [out])
     mm.transition({'state': 'end'}, {'state': 'middle'}, back, [])
     mm.transition({'state': 'middle'}, {'state': 'begin'}, back, [])
 
+
 class TraceTests(TestCase):
     def test_only_inputs(self):
         traces = []
+
         def tracer(old_state, input, new_state):
             traces.append((old_state, input, new_state))
-            return None # "I only care about inputs, not outputs"
+            return None  # "I only care about inputs, not outputs"
         s = SampleObject()
         s.setTrace(tracer)
 
@@ -74,11 +79,15 @@ class TraceTests(TestCase):
 
     def test_inputs_and_outputs(self):
         traces = []
+
         def tracer(old_state, input, new_state):
             traces.append((old_state, input, new_state, None))
+
             def trace_outputs(output):
                 traces.append((old_state, input, new_state, output))
-            return trace_outputs # "I care about outputs too"
+
+            return trace_outputs  # "I care about outputs too"
+
         s = SampleObject()
         s.setTrace(tracer)
 

@@ -118,21 +118,30 @@ class MethodicalInput(object):
     def _transition(self, instance):
         """
         Transition the state of `instance`
-        and get the corresponding outputs and collector.
+        and get the corresponding outputs, output tracer and collector.
 
         :type instance: Any
         :param instance: The instance on which the MethodicalInput was called.
-        :rtype: Tuple[tuple, Callable]
-        :return: The outputs, collector pair.
+        :rtype: Tuple[tuple, Optional[Callable], Callable]
+        :return: The outputs, out_tracer and collector.
         """
-        key = id(instance)
-        old_state = self._machine._instance_states[key]
+        id_ = id(instance)
+        old_state = self._machine._instance_states[id_]
         try:
             new_state, outputs, collector = self._transitions[old_state]
         except KeyError:
             raise NoTransition(state=old_state, symbol=self)
-        self._machine._instance_states[key] = new_state
-        return outputs, collector
+        self._machine._instance_states[id_] = new_state
+
+        def dummy_tracer(*args, **kwargs):
+            """ This is a dummy traccer. """
+
+        out_tracer = dummy_tracer
+        in_tracer = self._machine._instance_tracers.get(id_, dummy_tracer)
+        if in_tracer:
+            out_tracer = in_tracer(dict(old_state), self._name(), dict(new_state))
+
+        return outputs, out_tracer or dummy_tracer, collector
 
     def __get__(self, instance, type=None):
         """
@@ -144,7 +153,9 @@ class MethodicalInput(object):
         @wraps(self.method)
         def doInput(*args, **kwargs):
             self.method(instance, *args, **kwargs)
-            outputs, collector = self._transition(instance)
+            outputs, out_tracer, collector = self._transition(instance)
+            for output in outputs:
+                out_tracer(output._name())
             results = [o(instance, *args, **kwargs) for o in outputs]
             return collector(results)
         return doInput
@@ -185,15 +196,13 @@ class MethodicalOutput(object):
 
 @attr.s(cmp=False, hash=False)
 class MethodicalTracer(object):
-    automaton = attr.ib(repr=False)
-    symbol = attr.ib(repr=False)
-
+    machine = attr.ib()
 
     def __get__(self, oself, type=None):
-        transitioner = _transitionerFromInstance(oself, self.symbol,
-                                                 self.automaton)
+
         def setTrace(tracer):
-            transitioner.setTrace(tracer)
+            self.machine._instance_tracers[id(oself)] = tracer
+
         return setTrace
 
 
@@ -217,6 +226,7 @@ class MethodicalMachine(object):
         self._flags = []
         self._symbol = gensym()
         self._initial_state = {}
+        self._instance_tracers = {}
         self._instance_states = defaultdict(self._get_initial_state)
         self._serialization_map = {}
         self._has_transitions = False
@@ -431,9 +441,9 @@ class MethodicalMachine(object):
             return unserialize
         return decorator
 
-    # @property
-    # def _setTrace(self):
-    #     return MethodicalTracer(self._automaton, self._symbol)
+    @property
+    def _setTrace(self):
+        return MethodicalTracer(self)
 
     def asDigraph(self):
         """
