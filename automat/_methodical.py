@@ -221,7 +221,7 @@ def gensym():
     return "_symbol_" + str(next(counter))
 
 
-@attr.s()
+@attr.s
 class MethodicalMachine(object):
     """
     A :class:`MethodicalMachine` is an interface to an `Automaton`
@@ -229,35 +229,20 @@ class MethodicalMachine(object):
     """
 
     _flags = attr.ib(default=attr.Factory(list))
-    _symbol = attr.ib(default=attr.Factory(gensym))
-    _initialState = attr.ib(default=attr.Factory(dict))
-    _instanceTracers = attr.ib(default=attr.Factory(dict))
-    _instanceStates = attr.ib()
-    _serializationMap = attr.ib(default=attr.Factory(dict))
     _hasTransitions = attr.ib(default=False)
+    _initialState = attr.ib(default=attr.Factory(dict))
+    _inputs = attr.ib(default=attr.Factory(list))
+    _instanceStates = attr.ib()
+    _instanceTracers = attr.ib(default=attr.Factory(dict))
+    _serializationMap = attr.ib(default=attr.Factory(dict))
+    _symbol = attr.ib(default=attr.Factory(gensym))
 
     def _getInitialState(self):
         return frozenset(self._initialState.items())
 
     @_instanceStates.default
-    def _newInstanceStates(self):
+    def _getInstanceStates(self):
         return defaultdict(self._getInitialState)
-
-    @property
-    def _unserializationMap(self):
-        """ Mapping of serialized flag names to unserialized flag names. """
-        return {val: key for key, val in self._serializationMap.items()}
-
-    def __get__(self, oself, type=None):
-        """
-        L{MethodicalMachine} is an implementation detail for setting up
-        class-level state; applications should never need to access it on an
-        instance.
-        """
-        if oself is not None:
-            raise AttributeError(
-                "MethodicalMachine is an implementation detail.")
-        return self
 
     @_keywordsOnly
     def flag(self, states, initial, serialized=None):
@@ -300,9 +285,11 @@ class MethodicalMachine(object):
         This is a decorator for methods.
         """
         def decorator(inputMethod):
-            return MethodicalInput(machine=self,
+            input_ = MethodicalInput(machine=self,
                                    method=inputMethod,
                                    symbol=self._symbol)
+            self._inputs.append(input_)
+            return input_
         return decorator
 
     @_keywordsOnly
@@ -320,7 +307,11 @@ class MethodicalMachine(object):
         return decorator
 
     def _possibleStates(self):
-        """ Iterate over all possible flag combinations. """
+        """
+        Iterate over all possible flag combinations.
+
+        :rtype: Iterator[frozenset]
+        """
         flag_names = [f._name() for f in self._flags]
         flag_states = [f._states for f in self._flags]
         for combo in itertools.product(*flag_states):
@@ -425,7 +416,7 @@ class MethodicalMachine(object):
         :rtype: frozenset
         :returns: The internal state representation.
         """
-        mapping = self._unserializationMap
+        mapping = {val: key for key, val in self._serializationMap.items()}
         return frozenset((mapping[key], val) for key, val in state.items())
 
     @_keywordsOnly
@@ -458,9 +449,28 @@ class MethodicalMachine(object):
 
         """
         from ._visualize import makeDigraph
-        return makeDigraph(
-            self._automaton,
-            stateAsString=lambda state: state.method.__name__,
-            inputAsString=lambda input: input.method.__name__,
-            outputAsString=lambda output: output.method.__name__,
-        )
+        return makeDigraph(self)
+
+    def __get__(self, oself, type=None):
+        """
+        L{MethodicalMachine} is an implementation detail for setting up
+        class-level state; applications should never need to access it on an
+        instance.
+        """
+        if oself is not None:
+            raise AttributeError(
+                "MethodicalMachine is an implementation detail.")
+        return self
+
+    def _allTransitions(self):
+        """
+        Build an iterable of all transitions.
+
+        :return:
+        :rtype: Iterator[
+            Tuple[dict, MethodicalInput, dict, List[MethodicalOutput]]
+        ]
+        """
+        for input_ in self._inputs:
+            for from_, (to, outputs, _) in input_._transitions.items():
+                yield from_, input_, to, outputs

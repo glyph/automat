@@ -1,5 +1,6 @@
 from __future__ import print_function
 import argparse
+import json
 import sys
 
 import graphviz
@@ -60,47 +61,62 @@ def tableMaker(inputLabel, outputLabels, port, _E=elementMaker):
     return _E("table", *rows)
 
 
-def makeDigraph(automaton, inputAsString=repr,
-                outputAsString=repr,
-                stateAsString=repr):
+def _stateAsString(state):
     """
-    Produce a L{graphviz.Digraph} object from an automaton.
+    Convert an internal state representation to a string.
+
+    :param frozenset state:
+    :return: The string representation of the state.
+    :rtype: str
+    """
+    return json.dumps(dict(state), indent=2, sort_keys=True)
+
+
+def makeDigraph(machine):
+    """
+    Produce a L{graphviz.Digraph} object from a machine.
+
+    :param MethodicalMachine machine: The machine to graph.
     """
     digraph = graphviz.Digraph(graph_attr={'pack': 'true',
                                            'dpi': '100'},
                                node_attr={'fontname': 'Menlo'},
                                edge_attr={'fontname': 'Menlo'})
 
-    for state in automaton.states():
-        if state is automaton.initialState:
+    for state in machine._possibleStates():
+        if state == machine._getInitialState():
             stateShape = "bold"
             fontName = "Menlo-Bold"
         else:
             stateShape = ""
             fontName = "Menlo"
-        digraph.node(stateAsString(state),
+        digraph.node(_stateAsString(state),
                      fontame=fontName,
                      shape="ellipse",
                      style=stateShape,
                      color="blue")
-    for n, eachTransition in enumerate(automaton.allTransitions()):
-        inState, inputSymbol, outState, outputSymbols = eachTransition
+
+    for n, eachTransition in enumerate(machine._allTransitions()):
+        from_, input_, to, outputs = eachTransition
         thisTransition = "t{}".format(n)
-        inputLabel = inputAsString(inputSymbol)
 
         port = "tableport"
-        table = tableMaker(inputLabel, [outputAsString(outputSymbol)
-                                        for outputSymbol in outputSymbols],
-                           port=port)
+        table = tableMaker(
+            input_._method.__name__,
+            [output._method.__name__ for output in outputs],
+            port=port,
+        )
 
         digraph.node(thisTransition,
-                     label=_gvhtml(table), margin="0.2", shape="none")
+                     label=_gvhtml(table),
+                     margin="0.2",
+                     shape="none")
 
-        digraph.edge(stateAsString(inState),
+        digraph.edge(_stateAsString(from_),
                      '{}:{}:w'.format(thisTransition, port),
                      arrowhead="none")
         digraph.edge('{}:{}:e'.format(thisTransition, port),
-                     stateAsString(outState))
+                     _stateAsString(to))
 
     return digraph
 

@@ -40,21 +40,21 @@ def findMachinesViaWrapper(within):
     @return: a generator which yields FQPN, L{MethodicalMachine} pairs.
     """
     queue = collections.deque([within])
-    visited = set()
+    visited = []
 
     while queue:
         attr = queue.pop()
         value = attr.load()
 
         if isinstance(value, MethodicalMachine) and value not in visited:
-            visited.add(value)
+            visited.append(value)
             yield attr.name, value
         elif (inspect.isclass(value) and isOriginalLocation(attr) and
               value not in visited):
-            visited.add(value)
+            visited.append(value)
             queue.extendleft(attr.iterAttributes())
         elif isinstance(attr, PythonModule) and value not in visited:
-            visited.add(value)
+            visited.append(value)
             queue.extendleft(attr.iterAttributes())
             queue.extendleft(attr.iterModules())
 
