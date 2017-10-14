@@ -6,21 +6,32 @@ from automat import MethodicalMachine
 class LightSwitch(object):
     machine = MethodicalMachine()
 
-    @machine.flag([], '?', serialized="on")
-    def on_state(self):
-        "the switch is on"
-    @machine.flag([], initial=True, serialized="off")
-    def off_state(self):
-        "the switch is off"
+    @machine.flag(states=[True, False], initial=False,
+                  serialized="Is the light switch on?")
+    def state(self):
+        "the switch state flag"
+
     @machine.input()
     def flip(self):
         "flip the switch"
-    on_state.upon(flip, enter=off_state, outputs=[])
-    off_state.upon(flip, enter=on_state, outputs=[])
+
+    machine.transition(
+        from_={'state': True},
+        to={'state': False},
+        input=flip,
+        outputs=[],
+    )
+    machine.transition(
+        from_={'state': False},
+        to={'state': True},
+        input=flip,
+        outputs=[],
+    )
 
     @machine.input()
     def query_power(self):
         "return True if powered, False otherwise"
+
     @machine.output()
     def _is_powered(self):
         return True
@@ -28,18 +39,29 @@ class LightSwitch(object):
     @machine.output()
     def _not_powered(self):
         return False
-    on_state.upon(query_power, enter=on_state, outputs=[_is_powered],
-                  collector=itemgetter(0))
-    off_state.upon(query_power, enter=off_state, outputs=[_not_powered],
-                   collector=itemgetter(0))
+
+    machine.transition(
+        from_={'state': True},
+        to={'state': True},
+        input=query_power,
+        outputs=[_is_powered],
+        collector=itemgetter(0)
+    )
+    machine.transition(
+        from_={'state': False},
+        to={'state': False},
+        input=query_power,
+        outputs=[_not_powered],
+        collector=itemgetter(0),
+    )
 
     @machine.serializer()
     def save(self, state):
-        return {"is-it-on": state}
+        return state
 
     @machine.unserializer()
     def _restore(self, blob):
-        return blob["is-it-on"]
+        return blob
 
     @classmethod
     def from_blob(cls, blob):

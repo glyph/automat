@@ -1,5 +1,6 @@
 from automat import MethodicalMachine
 
+
 class Turnstile(object):
     machine = MethodicalMachine()
 
@@ -26,17 +27,29 @@ class Turnstile(object):
     def _nope(self):
         print("**Clunk!**  The turnstile doesn't move.")
 
-    @machine.flag([], initial=True)
+    @machine.flag(states=[True, False], initial=True)
     def _locked(self):
-        "The turnstile is locked."
+        "Indicates whether turnstile is locked."
 
-    @machine.flag([], '?')
-    def _unlocked(self):
-        "The turnstile is unlocked."
+    machine.transition(
+        from_={'_locked': True},
+        to={'_locked': False},
+        input=fare_paid,
+        outputs=[_disengage_lock],
+    )
+    machine.transition(
+        from_={'_locked': False},
+        to={'_locked': True},
+        input=arm_turned,
+        outputs=[_engage_lock],
+    )
+    machine.transition(
+        from_={'_locked': True},
+        to={'_locked': True},
+        input=arm_turned,
+        outputs=[_nope],
+    )
 
-    _locked.upon(fare_paid, enter=_unlocked, outputs=[_disengage_lock])
-    _unlocked.upon(arm_turned, enter=_locked, outputs=[_engage_lock])
-    _locked.upon(arm_turned, enter=_locked, outputs=[_nope])
 
 class Lock(object):
     "A sample I/O device."
@@ -46,6 +59,7 @@ class Lock(object):
 
     def disengage(self):
         print("Unlocked.")
+
 
 turner = Turnstile(Lock())
 turner.fare_paid()
