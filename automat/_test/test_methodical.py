@@ -1,4 +1,3 @@
-
 """
 Tests for the public interface of Automat.
 """
@@ -7,6 +6,7 @@ from unittest import TestCase
 
 from .. import MethodicalMachine, NoTransition
 from .. import _methodical
+
 
 class MethodicalTests(TestCase):
     """
@@ -23,6 +23,7 @@ class MethodicalTests(TestCase):
 
         class Machination(object):
             machine = MethodicalMachine()
+
             @machine.input()
             def anInput(self):
                 "an input"
@@ -58,7 +59,6 @@ class MethodicalTests(TestCase):
         self.assertEqual(m.anInput(), ["an-output-value"])
         self.assertEqual(m.anInput(), ["another-output-value"])
 
-
     def test_machineItselfIsPrivate(self):
         """
         L{MethodicalMachine} is an implementation detail.  If you attempt to
@@ -76,7 +76,6 @@ class MethodicalTests(TestCase):
                       str(cm.exception))
         self.assertIs(Machination.machine, expectedMachine)
 
-
     def test_outputsArePrivate(self):
         """
         One of the benefits of using a state machine is that your output method
@@ -85,24 +84,30 @@ class MethodicalTests(TestCase):
         broken if client code called output methods directly, so output methods
         are not directly visible under their names.
         """
+
         class Machination(object):
             machine = MethodicalMachine()
             counter = 0
+
             @machine.input()
             def anInput(self):
                 "an input"
+
             @machine.output()
             def anOutput(self):
                 self.counter += 1
+
             @machine.flag(states=['a', 'b'], initial='b')
             def flag(self):
                 "a machine state"
+
             machine.transition(
                 from_={'flag': 'b'},
                 to={'flag': 'b'},
                 input=anInput,
                 outputs=[anOutput],
             )
+
         mach1 = Machination()
         mach1.anInput()
         self.assertEqual(mach1.counter, 1)
@@ -110,13 +115,11 @@ class MethodicalTests(TestCase):
         with self.assertRaises(AttributeError) as cm:
             mach2.anOutput
         self.assertEqual(mach2.counter, 0)
-
         self.assertIn(
             "Machination.anOutput is a state-machine output method; to "
             "produce this output, call an input method instead.",
             str(cm.exception)
         )
-
 
     def test_multipleMachines(self):
         """
@@ -130,21 +133,27 @@ class MethodicalTests(TestCase):
             @a.input()
             def inputA(self):
                 "input A"
+
             @b.input()
             def inputB(self):
                 "input B"
+
             @a.flag(states=[1, 2], initial=1)
             def initialA(self):
                 "initial A"
+
             @b.flag(states=[3, 4], initial=3)
             def initialB(self):
                 "initial B"
+
             @a.output()
             def outputA(self):
                 return "A"
+
             @b.output()
             def outputB(self):
                 return "B"
+
             a.transition({'initialA': 1}, {'initialA': 2}, inputA, [outputA])
             b.transition({'initialB': 3}, {'initialB': 4}, inputB, [outputB])
 
@@ -152,72 +161,84 @@ class MethodicalTests(TestCase):
         self.assertEqual(mm.inputA(), ["A"])
         self.assertEqual(mm.inputB(), ["B"])
 
-
     def test_collectOutputs(self):
         """
         Outputs can be combined with the "collector" argument to "upon".
         """
         import operator
+
         class Machine(object):
             m = MethodicalMachine()
+
             @m.input()
             def input(self):
                 "an input"
+
             @m.output()
             def outputA(self):
                 return "A"
+
             @m.output()
             def outputB(self):
                 return "B"
-            @m.flag(states=[1], initial=1)
+
+            @m.flag(states=[1, 2], initial=1)
             def flag(self):
                 "a flag"
+
             m.transition({'flag': 1}, {'flag': 1}, input, [outputA, outputB],
                          collector=lambda x: reduce(operator.add, x))
+
         m = Machine()
         self.assertEqual(m.input(), "AB")
-
 
     def test_methodName(self):
         """
         Input methods preserve their declared names.
         """
+
         class Mech(object):
             m = MethodicalMachine()
+
             @m.input()
             def declaredInputName(self):
                 "an input"
-            @m.flag(states=[], initial='a')
+
+            @m.flag(states=['a', 'b'], initial='a')
             def aFlag(self):
                 "flag"
+
         m = Mech()
         with self.assertRaises(TypeError) as cm:
             m.declaredInputName("too", "many", "arguments")
         self.assertIn("declaredInputName", str(cm.exception))
 
-
     def test_inputWithArguments(self):
         """
         If an input takes an argument, it will pass that along to its output.
         """
+
         class Mechanism(object):
             m = MethodicalMachine()
+
             @m.input()
             def input(self, x, y=1):
                 "an input"
+
             @m.flag(states=['a', 'b', 'c'], initial='c')
             def flag(self):
                 "a flag"
+
             @m.output()
             def output(self, x, y=1):
                 self._x = x
                 return x + y
+
             m.transition({'flag': 'c'}, {'flag': 'b'}, input, [output])
 
         m = Mechanism()
         self.assertEqual(m.input(3), [4])
         self.assertEqual(m._x, 3)
-
 
     def test_inputFunctionsMustBeEmpty(self):
         """
@@ -243,47 +264,63 @@ class MethodicalTests(TestCase):
 
         class MechanismWithDocstring(object):
             m = MethodicalMachine()
+
             @m.input()
             def input(self):
                 "an input"
+
             @m.flag(states=[1, 2], initial=1)
             def flag(self):
                 "flag"
+
             m.transition({'flag': 1}, {'flag': 2}, input, [])
+
         MechanismWithDocstring().input()
 
         class MechanismWithPass(object):
             m = MethodicalMachine()
+
             @m.input()
             def input(self):
                 pass
+
             @m.flag(states=[1, 2], initial=1)
             def flag(self):
                 "flag"
+
             m.transition({'flag': 1}, {'flag': 2}, input, [])
+
         MechanismWithPass().input()
 
         class MechanismWithDocstringAndPass(object):
             m = MethodicalMachine()
+
             @m.input()
             def input(self):
                 "an input"
                 pass
+
             @m.flag(states=[1, 2], initial=1)
             def flag(self):
                 "flag"
+
             m.transition({'flag': 1}, {'flag': 2}, input, [])
+
         MechanismWithDocstringAndPass().input()
 
         class MechanismReturnsNone(object):
             m = MethodicalMachine()
+
             @m.input()
             def input(self):
                 return None
+
             @m.flag(states=[1, 2], initial=1)
             def flag(self):
                 "flag"
+
             m.transition({'flag': 1}, {'flag': 2}, input, [])
+
         MechanismReturnsNone().input()
 
         class MechanismWithDocstringAndReturnsNone(object):
@@ -292,39 +329,45 @@ class MethodicalTests(TestCase):
             def input(self):
                 "an input"
                 return None
+
             @m.flag(states=[1, 2], initial=1)
             def flag(self):
                 "flag"
+
             m.transition({'flag': 1}, {'flag': 2}, input, [])
+
         MechanismWithDocstringAndReturnsNone().input()
-
-
 
     def test_inputOutputMismatch(self):
         """
         All the argument lists of the outputs for a given input must match; if
         one does not the call to C{upon} will raise a C{TypeError}.
         """
+
         class Mechanism(object):
             m = MethodicalMachine()
+
             @m.input()
             def nameOfInput(self, a):
                 "an input"
+
             @m.output()
             def outputThatMatches(self, a):
                 "an output that matches"
+
             @m.output()
             def outputThatDoesntMatch(self, b):
                 "an output that doesn't match"
+
             @m.flag(states=['a', 'b'], initial='b')
             def flag(self):
                 "a flag"
+
             with self.assertRaises(TypeError) as cm:
                 m.transition({'flag': 'b'}, {'flag': 'a'}, nameOfInput,
                              [outputThatMatches, outputThatDoesntMatch])
             self.assertIn("nameOfInput", str(cm.exception))
             self.assertIn("outputThatDoesntMatch", str(cm.exception))
-
 
     def test_multipleTransitionsFailure(self):
         """
@@ -338,9 +381,11 @@ class MethodicalTests(TestCase):
             @m.flag(states=['start', 'end'], initial='start')
             def flag(self):
                 "The flag."
+
             @m.input()
             def event(self):
                 "An event."
+
             m.transition(
                 from_={'flag': 'start'},
                 to={'flag': 'end'},
@@ -363,15 +408,19 @@ class MethodicalTests(TestCase):
 
         class OnlyOnePath(object):
             m = MethodicalMachine()
+
             @m.flag(states=['start', 'end'], initial='start')
             def flag(self):
                 "The flag."
+
             @m.input()
             def advance(self):
                 "Move from start to end."
+
             @m.input()
             def deadEnd(self):
                 "A transition from nowhere to nowhere."
+
             m.transition({'flag': 'start'}, {'flag': 'end'}, advance, [])
 
         machine = OnlyOnePath()
@@ -385,7 +434,6 @@ class MethodicalTests(TestCase):
         self.assertIn("deadEnd", str(cm.exception))
         self.assertIn("end", str(cm.exception))
 
-
     def test_saveState(self):
         """
         L{MethodicalMachine.serializer} is a decorator that expects its
@@ -394,14 +442,18 @@ class MethodicalTests(TestCase):
 
         class Mechanism(object):
             m = MethodicalMachine()
+
             def __init__(self):
                 self.value = 1
-            @m.flag(states=[], initial='off', serialized='First')
+
+            @m.flag(states=['on', 'off'], initial='off', serialized='First')
             def first(self):
                 "First flag."
-            @m.flag(states=[], initial=1, serialized='Second')
+
+            @m.flag(states=[1, 2], initial=1, serialized='Second')
             def second(self):
                 "Second flag."
+
             @m.serializer()
             def save(self, state):
                 return {
@@ -427,26 +479,33 @@ class MethodicalTests(TestCase):
 
         class Mechanism(object):
             m = MethodicalMachine()
+
             def __init__(self):
                 self.value = 1
                 self.ranOutput = False
+
             @m.flag(states=['off', 'on'], initial='off', serialized='First')
             def first(self):
                 "First flag."
+
             @m.flag(states=[1, 2], initial=1, serialized='Second')
             def second(self):
                 "Second flag."
+
             @m.input()
             def input(self):
                 "an input"
+
             @m.output()
             def output(self):
                 self.value = 2
                 self.ranOutput = True
                 return 1
+
             @m.output()
             def output2(self):
                 return 2
+
             m.transition(
                 from_={'first': 'off', 'second': 1},
                 to={'first': 'on', 'second': 2},
@@ -461,16 +520,19 @@ class MethodicalTests(TestCase):
                 outputs=[output2],
                 collector=lambda x: list(x)[0],
             )
+
             @m.serializer()
             def save(self, state):
                 return {
                     'machine-state': state,
                     'some-value': self.value,
                 }
+
             @m.unserializer()
             def _restore(self, blob):
                 self.value = blob['some-value']
                 return blob['machine-state']
+
             @classmethod
             def fromBlob(cls, blob):
                 self = cls()
@@ -490,6 +552,32 @@ class MethodicalTests(TestCase):
                 'some-value': 2,
             }
         )
+
+    def test_flags_must_have_more_than_one_state(self):
+        """
+        An error should be raised if a flag is defined
+        with fewer than two states.
+        """
+
+        class Mechanism(object):
+            mm = MethodicalMachine()
+            with self.assertRaises(ValueError):
+                @mm.flag(states=['one'], initial='one')
+                def state(self):
+                    """some state flag"""
+
+    def test_initial_flag_state_must_be_in_states(self):
+        """
+        An error should be raised if a flag's initial state
+        is not in it's states list.
+        """
+
+        class Mechanism(object):
+            mm = MethodicalMachine()
+            with self.assertRaises(ValueError):
+                @mm.flag(states=[1, 2], initial=500)
+                def state(self):
+                    """some state flag"""
 
 
 # FIXME: error for wrong types on any call to _oneTransition

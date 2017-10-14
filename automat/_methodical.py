@@ -264,6 +264,13 @@ class MethodicalMachine(object):
         """
         if self._hasTransitions:
             raise RuntimeError('Flags may not be added after transitions.')
+        if len(states) < 2:
+            raise ValueError('Flags must have at least two states.')
+        if initial not in states:
+            raise ValueError('The initial state {} '
+                             'must be in the states list {} '
+                             'but was not found there.'
+                             .format(repr(initial), repr(states)))
 
         def decorator(flagMethod):
             flag = MethodicalFlag(
