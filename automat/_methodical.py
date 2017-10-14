@@ -361,6 +361,18 @@ class MethodicalMachine(object):
                     .format(state, input._name())
                 )
 
+    def _validateState(self, state):
+        """
+        Check that `state` is a subset of a possible state for the machine.
+
+        :param frozenset state:
+        :raises ValueError: if `state` is not valid
+        """
+        for s in self._possibleStates():
+            if state.issubset(s):
+                return
+        raise ValueError('{} is not a valid state.'.format(dict(state)))
+
     def transition(self, from_, to, input, outputs, collector=list):
         """
         Declare a state transition from one state to another
@@ -379,16 +391,22 @@ class MethodicalMachine(object):
             the return values of all the outputs.
         """
         self._hasTransitions = True
-
         self._validateSignatures(input, outputs)
-
         from_set = frozenset(from_.items())
+        to_set = frozenset(to.items())
+        self._validateState(from_set)
+        self._validateState(to_set)
+
+        if set(to) != set(from_):
+            raise ValueError('The flags in to {} '
+                             'must be the same as the flags in from_ {}'
+                             .format(list(to), list(from_)))
+
         from_states = [s for s in self._possibleStates()
                        if s.issuperset(from_set)]
 
         self._checkThatTransitionIsUnique(from_states, input)
 
-        to_set = frozenset(to.items())
         for state in from_states:
             input._transitions[state] = (to_set, outputs, collector)
 

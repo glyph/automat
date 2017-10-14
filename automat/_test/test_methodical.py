@@ -579,6 +579,61 @@ class MethodicalTests(TestCase):
                 def state(self):
                     """some state flag"""
 
+    def test_from_must_be_a_subset_of_a_valid_state(self):
+        """ 'from_` must contain flags and values that have been defined. """
+
+        class Methodical(object):
+            mm = MethodicalMachine()
+
+            @mm.flag(states=[1, 2], initial=2)
+            def flag(self):
+                """a flag"""
+
+            @mm.input()
+            def go(self):
+                """do something"""
+
+            with self.assertRaises(ValueError):
+                mm.transition({'pole': 'saw'}, {'pole': 'barn'}, go, [])
+
+    def test_to_must_be_a_subset_of_a_valid_state(self):
+        """ 'to` must contain values that have been defined. """
+
+        class Methodical(object):
+            mm = MethodicalMachine()
+
+            @mm.flag(states=[1, 2], initial=2)
+            def flag(self):
+                """a flag"""
+
+            @mm.input()
+            def go(self):
+                """do something"""
+
+            with self.assertRaises(ValueError):
+                mm.transition({'flag': 1}, {'flag': 'pole'}, go, [])
+
+    def test_to_state_must_match_from_state(self):
+        """ `to` must have the same keys as `from_` """
+
+        class Mechanism(object):
+            mm = MethodicalMachine()
+
+            @mm.flag(states=[1, 2], initial=1)
+            def one(self):
+                """a flag"""
+
+            @mm.flag(states=['a', 'b'], initial='b')
+            def two(self):
+                """another flag"""
+
+            @mm.input()
+            def go(self):
+                """do something"""
+
+            with self.assertRaises(ValueError):
+                mm.transition({'one': 2}, {'one': 1, 'two': 'b'}, go, [])
+
 
 # FIXME: error for wrong types on any call to _oneTransition
 # FIXME: better public API for .upon; maybe a context manager?
