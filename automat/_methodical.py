@@ -54,9 +54,7 @@ class NoTransition(Exception):
 @attr.s(frozen=True)
 class MethodicalFlag(object):
     """
-    A state for a L{MethodicalMachine}.
-
-    :ivar tuple _states:
+    A flag for a L{MethodicalMachine}.
     """
     _states = attr.ib(convert=tuple)
     _method = attr.ib()
@@ -247,20 +245,21 @@ class MethodicalMachine(object):
     @_keywordsOnly
     def flag(self, states, initial, serialized=None):
         """
-        Declare a state, possibly an initial state or a terminal state.
+        Declare a flag.
 
         This is a decorator for methods, but it will modify the method so as
         not to be callable any more.
 
-        :param initial: is this state the initial state?  Only one state on
-            this :class:`automat.MethodicalMachine` may be an initial state; more than one is
-            an error.
+        @param states: A list of the possible values for this flag.
+        @type states: List[Hashable]
+
+        @param initial: Which is the initial value for this flag?
+        @type initial: L{bool}
 
         @param serialized: a serializable value to be used to represent this
             state to external systems.  This value should be hashable;
             L{unicode} is a good type to use.
         @type serialized: a hashable (comparable) value
-        :param states:
         """
         if self._hasTransitions:
             raise RuntimeError('Flags may not be added after transitions.')
@@ -351,7 +350,7 @@ class MethodicalMachine(object):
         """
 
         :param List[frozenset] from_states: A list of all flag combinations,
-            that input will transition from.
+            that input will potentially transition from.
         :param MethodicalInput input:
         :raises ValueError: If any of the from states are already registered.
         """
@@ -366,6 +365,10 @@ class MethodicalMachine(object):
         """
         Declare a state transition from one state to another
         when an input is called triggering certain outputs.
+
+        If ``from_`` does not contain all the flags that exist for the machine,
+        several transitions will be created,
+        one for each permutation of the possible full states.
 
         :param dict from_: The state to transition from.
         :param dict to: The state to transition to.
