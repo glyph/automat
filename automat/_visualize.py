@@ -1,6 +1,5 @@
 from __future__ import print_function
 import argparse
-import json
 import sys
 
 import graphviz
@@ -69,7 +68,18 @@ def _stateAsString(state):
     :return: The string representation of the state.
     :rtype: str
     """
-    return json.dumps(dict(state), indent=2, sort_keys=True)
+    rows = []
+    for name, value in state:
+        rows.append('{} = {}'.format(name, value))
+    string = '\n'.join(rows)
+    if ':' in string:
+        # graphviz splits names on colons
+        # and treats the part after the colon as a port,
+        # but it only does this for edges!
+        # Colons in names will likely cause graphviz to crash,
+        # and they will certainly cause the generated graph to be wrong.
+        raise ValueError('":" is not a valid character for state names.')
+    return string
 
 
 def makeDigraph(machine):
