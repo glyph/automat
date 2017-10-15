@@ -126,26 +126,26 @@ class MethodicalInput(object):
 
         :type instance: Any
         :param instance: The instance on which the MethodicalInput was called.
-        :rtype: Tuple[tuple, Optional[Callable], Callable]
-        :return: The outputs, out_tracer and collector.
+        :rtype: Tuple[tuple, Callable, Callable]
+        :return: The outputs, outTracer and collector.
         """
         id_ = id(instance)
-        old_state = self._machine._instanceStates[id_]
+        oldState = self._machine._instanceStates[id_]
         try:
-            new_state, outputs, collector = self._transitions[old_state]
+            newState, outputs, collector = self._transitions[oldState]
         except KeyError:
-            raise NoTransition(state=old_state, symbol=self)
-        self._machine._instanceStates[id_] = new_state
+            raise NoTransition(state=oldState, symbol=self)
+        self._machine._instanceStates[id_] = newState
 
-        def dummy_tracer(*args, **kwargs):
+        def dummyTracer(*args, **kwargs):
             """ This is a dummy traccer. """
 
-        out_tracer = dummy_tracer
-        in_tracer = self._machine._instanceTracers.get(id_, dummy_tracer)
-        if in_tracer:
-            out_tracer = in_tracer(dict(old_state), self._name(), dict(new_state))
+        outTracer = dummyTracer
+        inTracer = self._machine._instanceTracers.get(id_, dummyTracer)
+        if inTracer:
+            outTracer = inTracer(dict(oldState), self._name(), dict(newState))
 
-        return outputs, out_tracer or dummy_tracer, collector
+        return outputs, outTracer or dummyTracer, collector
 
     def __get__(self, instance, type=None):
         """
@@ -159,9 +159,9 @@ class MethodicalInput(object):
             # Check that function was called with the correct signature.
             self._method(instance, *args, **kwargs)
 
-            outputs, out_tracer, collector = self._transition(instance)
+            outputs, outTracer, collector = self._transition(instance)
             for output in outputs:
-                out_tracer(output._name())
+                outTracer(output._name())
             results = [o(instance, *args, **kwargs) for o in outputs]
             return collector(results)
 
@@ -318,10 +318,10 @@ class MethodicalMachine(object):
 
         :rtype: Iterator[frozenset]
         """
-        flag_names = [f._name() for f in self._flags]
-        flag_states = [f._states for f in self._flags]
-        for combo in itertools.product(*flag_states):
-            yield frozenset(zip(flag_names, combo))
+        flagNames = [f._name() for f in self._flags]
+        flagStates = [f._states for f in self._flags]
+        for combo in itertools.product(*flagStates):
+            yield frozenset(zip(flagNames, combo))
 
     def _validateSignatures(self, input, outputs):
         """
@@ -346,15 +346,15 @@ class MethodicalMachine(object):
                     )
                 )
 
-    def _checkThatTransitionIsUnique(self, from_states, input):
+    def _checkThatTransitionIsUnique(self, fromStates, input):
         """
 
-        :param List[frozenset] from_states: A list of all flag combinations,
+        :param List[frozenset] fromStates: A list of all flag combinations,
             that input will potentially transition from.
         :param MethodicalInput input:
         :raises ValueError: If any of the from states are already registered.
         """
-        for state in from_states:
+        for state in fromStates:
             if state in input._transitions:
                 raise ValueError(
                     "already have transition from {} via {}"
@@ -392,23 +392,29 @@ class MethodicalMachine(object):
         """
         self._hasTransitions = True
         self._validateSignatures(input, outputs)
-        from_set = frozenset(from_.items())
-        to_set = frozenset(to.items())
-        self._validateState(from_set)
-        self._validateState(to_set)
+        fromSet = frozenset(from_.items())
+        toSet = frozenset(to.items())
+        self._validateState(fromSet)
+        self._validateState(toSet)
 
         if set(to) != set(from_):
             raise ValueError('The flags in to {} '
                              'must be the same as the flags in from_ {}'
                              .format(list(to), list(from_)))
 
-        from_states = [s for s in self._possibleStates()
-                       if s.issuperset(from_set)]
+        fromStates = [s for s in self._possibleStates()
+                      if s.issuperset(fromSet)]
 
-        self._checkThatTransitionIsUnique(from_states, input)
+        self._checkThatTransitionIsUnique(fromStates, input)
 
-        for state in from_states:
-            input._transitions[state] = (to_set, outputs, collector)
+        toStates = []
+        for state in fromStates:
+            state = dict(state)
+            state.update(to.items())
+            toStates.append(frozenset(state.items()))
+
+        for fromVariant, toVariant in zip(fromStates, toStates):
+            input._transitions[fromVariant] = (toVariant, outputs, collector)
 
     def _serialize(self, state):
         """
@@ -420,7 +426,7 @@ class MethodicalMachine(object):
         :returns: The serialized state of `obj`.
         """
         mapping = self._serializationMap
-        return {mapping[flag_name]: value for flag_name, value in state}
+        return {mapping[flagName]: value for flagName, value in state}
 
     @_keywordsOnly
     def serializer(self):
@@ -455,8 +461,8 @@ class MethodicalMachine(object):
         def decorator(func):
             @wraps(func)
             def unserialize(oself, *args, **kwargs):
-                serialized_state = func(oself, *args, **kwargs)
-                state = self._unserialize(serialized_state)
+                serializedState = func(oself, *args, **kwargs)
+                state = self._unserialize(serializedState)
                 self._instanceStates[id(oself)] = state
                 return None  # it's on purpose
             return unserialize

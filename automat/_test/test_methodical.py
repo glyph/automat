@@ -553,7 +553,7 @@ class MethodicalTests(TestCase):
             }
         )
 
-    def test_flags_must_have_more_than_one_state(self):
+    def test_flagsMustHaveMoreThanOneState(self):
         """
         An error should be raised if a flag is defined
         with fewer than two states.
@@ -566,7 +566,7 @@ class MethodicalTests(TestCase):
                 def state(self):
                     """some state flag"""
 
-    def test_initial_flag_state_must_be_in_states(self):
+    def test_initialFlagStateMustBeInStates(self):
         """
         An error should be raised if a flag's initial state
         is not in it's states list.
@@ -579,7 +579,7 @@ class MethodicalTests(TestCase):
                 def state(self):
                     """some state flag"""
 
-    def test_from_must_be_a_subset_of_a_valid_state(self):
+    def test_fromMustBeASubsetOfAValidState(self):
         """ 'from_` must contain flags and values that have been defined. """
 
         class Methodical(object):
@@ -596,7 +596,7 @@ class MethodicalTests(TestCase):
             with self.assertRaises(ValueError):
                 mm.transition({'pole': 'saw'}, {'pole': 'barn'}, go, [])
 
-    def test_to_must_be_a_subset_of_a_valid_state(self):
+    def test_toMustBeASubsetOfAValidState(self):
         """ 'to` must contain values that have been defined. """
 
         class Methodical(object):
@@ -613,7 +613,7 @@ class MethodicalTests(TestCase):
             with self.assertRaises(ValueError):
                 mm.transition({'flag': 1}, {'flag': 'pole'}, go, [])
 
-    def test_to_state_must_match_from_state(self):
+    def test_toStateMatchesFromState(self):
         """ `to` must have the same keys as `from_` """
 
         class Mechanism(object):
@@ -633,6 +633,38 @@ class MethodicalTests(TestCase):
 
             with self.assertRaises(ValueError):
                 mm.transition({'one': 2}, {'one': 1, 'two': 'b'}, go, [])
+
+    def test_toStateIsExpandedToAFullState(self):
+        """
+        Even if `from_` and `to` are partial states, they should be expanded
+        so that the machine's state always contains all flags.
+        """
+
+        class Mechanism(object):
+            mm = MethodicalMachine()
+
+            @mm.flag(states=[1, 2], initial=1)
+            def one(self):
+                """a flag"""
+
+            @mm.flag(states=['a', 'b'], initial='b')
+            def two(self):
+                """another flag"""
+
+            @mm.input()
+            def go(self):
+                """do something"""
+
+            @mm.serializer()
+            def save(self, state):
+                return state
+
+            mm.transition({'one': 1}, {'one': 2}, go, [])
+
+        m = Mechanism()
+        self.assertEqual(m.save(), {'one': 1, 'two': 'b'})
+        m.go()
+        self.assertEqual(m.save(), {'one': 2, 'two': 'b'})
 
 
 # FIXME: error for wrong types on any call to _oneTransition
