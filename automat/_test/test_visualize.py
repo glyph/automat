@@ -247,6 +247,12 @@ class SpotChecks(TestCase):
         self.assertIn("go", gvout)
         self.assertIn("out", gvout)
 
+    def test_noColons(self):
+        """ Flag names and values may not contain colons. """
+        from automat._visualize import _stateAsString
+        with self.assertRaises(ValueError):
+            _stateAsString(frozenset([('name with :', 'value with :')]))
+
 
 class RecordsDigraphActions(object):
     """

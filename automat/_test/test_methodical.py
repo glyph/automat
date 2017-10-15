@@ -666,6 +666,27 @@ class MethodicalTests(TestCase):
         m.go()
         self.assertEqual(m.save(), {'one': 2, 'two': 'b'})
 
+    def test_noFlagsAfterTransistions(self):
+        """ New flags may not be added after transitions. """
+
+        class Mechanism(object):
+            mm = MethodicalMachine()
+
+            @mm.flag(states=[1, 2], initial=1)
+            def one(self):
+                """a flag"""
+
+            @mm.input()
+            def go(self):
+                """do something"""
+
+            mm.transition({'one': 1}, {'one': 2}, go, [])
+
+            with self.assertRaises(RuntimeError):
+                @mm.flag(states=['a', 'b'], initial='b')
+                def two(self):
+                    """another flag"""
+
 
 # FIXME: error for wrong types on any call to _oneTransition
 # FIXME: better public API for .upon; maybe a context manager?
