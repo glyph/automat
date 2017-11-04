@@ -4,3 +4,4 @@
 *.py[co]
 build/
 dist/
+docs/_build/
