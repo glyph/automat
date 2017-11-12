@@ -101,7 +101,7 @@ class FoodSlot(object):
     @machine.output()
     def unlockDoor(self):
         """
-        Lock the door, we don't need food.
+        Unock the door, it's chow time!.
         """
         self._door.unlock()
 
