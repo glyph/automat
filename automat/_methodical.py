@@ -37,10 +37,10 @@ class NoTransition(Exception):
     """
     A finite state machine in C{state} has no transition for C{symbol}.
 
-    @param state: the finite state machine's state at the time of the
+    :param state: the finite state machine's state at the time of the
         illegal transition.
 
-    @param symbol: the input symbol for which no transition exists.
+    :param symbol: the input symbol for which no transition exists.
     """
 
     def __init__(self, state, symbol):
@@ -105,9 +105,7 @@ def assertNoCode(inst, attribute, f):
 @attr.s(cmp=False, hash=False)
 class MethodicalInput(object):
     """
-    An input for a L{MethodicalMachine}.
-
-    :ivar dict collectors:
+    An input for a :py:class:`MethodicalMachine`.
     """
     _machine = attr.ib(repr=False)  # type: MethodicalMachine
     _method = attr.ib(validator=assertNoCode)  # type: Callable
@@ -222,7 +220,7 @@ def gensym():
 @attr.s
 class MethodicalMachine(object):
     """
-    A :class:`MethodicalMachine` is an interface to an `Automaton`
+    A :py:class:`MethodicalMachine` is an interface to an `Automaton`
     that uses methods on a class.
     """
 
@@ -250,16 +248,16 @@ class MethodicalMachine(object):
         This is a decorator for methods, but it will modify the method so as
         not to be callable any more.
 
-        @param states: A list of the possible values for this flag.
-        @type states: List[Hashable]
+        :param states: A list of the possible values for this flag.
+        :type states: List[Hashable]
 
-        @param initial: Which is the initial value for this flag?
-        @type initial: L{bool}
+        :param initial: Which is the initial value for this flag?
+        :type initial: Any
 
-        @param serialized: a serializable value to be used to represent this
+        :param serialized: a serializable value to be used to represent this
             state to external systems.  This value should be hashable;
-            L{unicode} is a good type to use.
-        @type serialized: a hashable (comparable) value
+            :py:class:`unicode` is a good type to use.
+        :type serialized: a hashable (comparable) value
         """
         if self._hasTransitions:
             raise RuntimeError('Flags may not be added after transitions.')
@@ -327,8 +325,8 @@ class MethodicalMachine(object):
         """
         Check that all of the output signatures match the input signature.
 
-        :param MethodicalInput input:
-        :param Iterable[MethodicalOutput] outputs:
+        :type input: MethodicalInput
+        :type outputs: Iterable[MethodicalOutput]
         :raises: TypeError if there is a miss match.
         """
         inputSpec = getArgsSpec(input._method)
@@ -348,10 +346,13 @@ class MethodicalMachine(object):
 
     def _checkThatTransitionIsUnique(self, fromStates, input):
         """
-
-        :param List[frozenset] fromStates: A list of all flag combinations,
+        :type fromStates: List[frozenset]
+        :param fromStates: A list of all flag combinations,
             that input will potentially transition from.
-        :param MethodicalInput input:
+
+        :type input: MethodicalInput
+        :param input: The input to check for conflicting transitions.
+
         :raises ValueError: If any of the from states are already registered.
         """
         for state in fromStates:
@@ -365,7 +366,7 @@ class MethodicalMachine(object):
         """
         Check that `state` is a subset of a possible state for the machine.
 
-        :param frozenset state:
+        :type state: frozenset
         :raises ValueError: if `state` is not valid
         """
         for s in self._possibleStates():
@@ -382,13 +383,20 @@ class MethodicalMachine(object):
         several transitions will be created,
         one for each permutation of the possible full states.
 
-        :param dict from_: The state to transition from.
-        :param dict to: The state to transition to.
-        :param MethodicalInput input: The input that triggers the transition.
-        :param List[MethodicalOutput] outputs: The outputs that are called
-            when the transition occurs.
-        :param Optional[Callable] collector: A function to collect
-            the return values of all the outputs.
+        :type from_: dict
+        :param from_: The state to transition from.
+
+        :type to: dict
+        :param to: The state to transition to.
+
+        :type input: MethodicalInput
+        :param input: The input that triggers the transition.
+
+        :type outputs: List[MethodicalOutput]
+        :param outputs: The outputs that are called when the transition occurs.
+
+        :type collector: Optional[Callable]
+        :param collector: A function to collect the return values of all the outputs.
         """
         self._hasTransitions = True
         self._validateSignatures(input, outputs)
@@ -420,8 +428,10 @@ class MethodicalMachine(object):
         """
         Convert an unserialized state into it's serialized representation.
 
-        :param frozenset state: The instance of a class
+        :type state: frozenset
+        :param state: The instance of a class
             with a :py:class:`MethodicalMachine` attribute.
+
         :rtype: Dict[str, Any]
         :returns: The serialized state of `obj`.
         """
@@ -446,7 +456,9 @@ class MethodicalMachine(object):
         Reconstruct the state of a mechanized object
         from it's serialized representation.
 
-        :param Dict[str, Any] state: The state to reconstruct.
+        :type state: Dict[str, Any]
+        :param state: The state to reconstruct.
+
         :rtype: frozenset
         :returns: The internal state representation.
         """
@@ -474,22 +486,20 @@ class MethodicalMachine(object):
 
     def asDigraph(self):
         """
-        Generate a L{graphviz.Digraph} that represents this machine's
+        Generate a :py:class:`graphviz.Digraph` that represents this machine's
         states and transitions.
 
-        @return: L{graphviz.Digraph} object; for more information, please
-            see the documentation for
-            U{graphviz<https://graphviz.readthedocs.io/>}
-
+        :return: :py:class:`graphviz.Digraph` object;
+            for more information, please see the documentation for
+            `graphviz <https://graphviz.readthedocs.io/>`_
         """
         from ._visualize import makeDigraph
         return makeDigraph(self)
 
     def __get__(self, oself, type=None):
         """
-        L{MethodicalMachine} is an implementation detail for setting up
-        class-level state; applications should never need to access it on an
-        instance.
+        :py:class:`MethodicalMachine` is an implementation detail for setting up
+        class-level state; applications should never need to access it on an instance.
         """
         if oself is not None:
             raise AttributeError(
@@ -500,10 +510,7 @@ class MethodicalMachine(object):
         """
         Build an iterable of all transitions.
 
-        :return:
-        :rtype: Iterator[
-            Tuple[dict, MethodicalInput, dict, List[MethodicalOutput]]
-        ]
+        :rtype: Iterator[Tuple[dict, MethodicalInput, dict, List[MethodicalOutput]]]
         """
         for input_ in self._inputs:
             for from_, (to, outputs, _) in input_._transitions.items():
