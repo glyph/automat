@@ -4,8 +4,6 @@ Python introspection helpers.
 
 from types import CodeType as code, FunctionType as function
 
-import six
-
 
 def copycode(template, changes):
     names = [
@@ -13,7 +11,7 @@ def copycode(template, changes):
         "names", "varnames", "filename", "name", "firstlineno", "lnotab",
         "freevars", "cellvars"
     ]
-    if six.PY3:
+    if hasattr(code, "co_kwonlyargcount"):
         names.insert(1, "kwonlyargcount")
     values = [
         changes.get(name, getattr(template, "co_" + name))
