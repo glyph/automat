@@ -4,13 +4,14 @@ Python introspection helpers.
 
 from types import CodeType as code, FunctionType as function
 
+
 def copycode(template, changes):
     names = [
         "argcount", "nlocals", "stacksize", "flags", "code", "consts",
         "names", "varnames", "filename", "name", "firstlineno", "lnotab",
         "freevars", "cellvars"
     ]
-    if str is not bytes:
+    if hasattr(code, "co_kwonlyargcount"):
         names.insert(1, "kwonlyargcount")
     values = [
         changes.get(name, getattr(template, "co_" + name))
