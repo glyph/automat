@@ -1,5 +1,5 @@
-
 from automat import MethodicalMachine
+
 
 class Door(object):
     def unlock(self):
@@ -8,12 +8,14 @@ class Door(object):
     def lock(self):
         print("Locking the door so you can't steal the food.")
 
+
 class Light(object):
     def on(self):
         print("Need some food over here.")
 
     def off(self):
         print("We're good on food for now.")
+
 
 class FoodSlot(object):
     """
@@ -31,19 +33,15 @@ class FoodSlot(object):
         self._light = light
         self.start()
 
-    @machine.state(initial=True)
-    def initial(self):
+    @machine.flag(states=['initial', 'empty', 'ready', 'serving'],
+                  initial='initial')
+    def state(self):
         """
-        The initial state when we are constructed.
+        The possible states that a food slot can have.
 
-        Note that applications never see this state, because the constructor
-        provides an input to transition out of it immediately.
-        """
-
-    @machine.state()
-    def empty(self):
-        """
-        The machine is empty (and the light asking for food is on).
+        Note that applications never see the "initial" state,
+        because the constructor provides an input
+        to transition out of it immediately.
         """
 
     @machine.input()
@@ -51,18 +49,6 @@ class FoodSlot(object):
         """
         A private input, for transitioning to the initial blank state to
         'empty', making sure the door and light are properly configured.
-        """
-
-    @machine.state()
-    def ready(self):
-        """
-        We've got some food and we're ready to serve it.
-        """
-
-    @machine.state()
-    def serving(self):
-        """
-        The door is open, we're serving food.
         """
 
     @machine.input()
@@ -75,6 +61,12 @@ class FoodSlot(object):
     def food(self):
         """
         Food was prepared and inserted into the back of the machine.
+        """
+
+    @machine.input()
+    def closeDoor(self):
+        """
+        The door was closed.
         """
 
     @machine.output()
@@ -105,18 +97,30 @@ class FoodSlot(object):
         """
         self._door.unlock()
 
-    @machine.input()
-    def closeDoor(self):
-        """
-        The door was closed.
-        """
-
-    initial.upon(start, enter=empty, outputs=[lockDoor, turnOnFoodLight])
-    empty.upon(food, enter=ready, outputs=[turnOffFoodLight])
-    ready.upon(coin, enter=serving, outputs=[unlockDoor])
-    serving.upon(closeDoor, enter=empty, outputs=[lockDoor,
-                                                  turnOnFoodLight])
-
+    machine.transition(
+        from_={'state': 'initial'},
+        to={'state': 'empty'},
+        input=start,
+        outputs=[lockDoor, turnOnFoodLight]
+    )
+    machine.transition(
+        from_={'state': 'empty'},
+        to={'state': 'ready'},
+        input=food,
+        outputs=[turnOffFoodLight],
+    )
+    machine.transition(
+        from_={'state': 'ready'},
+        to={'state': 'serving'},
+        input=coin,
+        outputs=[unlockDoor],
+    )
+    machine.transition(
+        from_={'state': 'serving'},
+        to={'state': 'empty'},
+        input=closeDoor,
+        outputs=[lockDoor, turnOnFoodLight]
+    )
 
 
 slot = FoodSlot(Door(), Light())
@@ -132,4 +136,3 @@ if __name__ == '__main__':
     # slot.closeDoor()
     # raw_input("Hit enter to make some more food: ")
     # slot.food()
-

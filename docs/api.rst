@@ -3,7 +3,4 @@ API Docs
 ========
 
 .. autoclass:: automat.MethodicalMachine
-   :members: input, output, state
-
-
-.. automethod:: automat._methodical.MethodicalState.upon
+   :members: input, output, flag, transition, serializer, unserializer

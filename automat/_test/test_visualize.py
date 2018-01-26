@@ -36,26 +36,24 @@ def isGraphvizInstalled():
         os.close(r)
 
 
-
 def sampleMachine():
     """
     Create a sample L{MethodicalMachine} with some sample states.
     """
     mm = MethodicalMachine()
+
     class SampleObject(object):
-        @mm.state(initial=True)
-        def begin(self):
-            "initial state"
-        @mm.state()
-        def end(self):
-            "end state"
+        @mm.flag(states=['begin', 'end'], initial='begin')
+        def state(self):
+            "A flag"
         @mm.input()
         def go(self):
             "sample input"
         @mm.output()
         def out(self):
             "sample output"
-        begin.upon(go, end, [out])
+        mm.transition({'state': 'begin'}, {'state': 'end'}, go, [out])
+
     so = SampleObject()
     so.go()
     return mm
@@ -248,6 +246,12 @@ class SpotChecks(TestCase):
         self.assertIn("end", gvout)
         self.assertIn("go", gvout)
         self.assertIn("out", gvout)
+
+    def test_noColons(self):
+        """ Flag names and values may not contain colons. """
+        from automat._visualize import _stateAsString
+        with self.assertRaises(ValueError):
+            _stateAsString(frozenset([('name with :', 'value with :')]))
 
 
 class RecordsDigraphActions(object):
