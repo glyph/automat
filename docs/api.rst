@@ -2,6 +2,8 @@
 API Docs
 ========
 
+.. automodule:: automat
+
 .. autoclass:: automat.MethodicalMachine
    :members: input, output, state
 
