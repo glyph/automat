@@ -93,8 +93,8 @@ only two states are `have_beans` and `dont_have_beans`:
             "In this state, you have some beans."
 
         @_machine.state(initial=True)
-            def dont_have_beans(self):
-                "In this state, you don't have any beans."
+        def dont_have_beans(self):
+            "In this state, you don't have any beans."
 
 
 `dont_have_beans` is the `initial` state
