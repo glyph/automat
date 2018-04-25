@@ -6,8 +6,10 @@ Tests for the public interface of Automat.
 from functools import reduce
 from unittest import TestCase
 
+from automat._methodical import ArgSpec, _getArgNames, _getArgSpec, _filterArgs
 from .. import MethodicalMachine, NoTransition
 from .. import _methodical
+
 
 class MethodicalTests(TestCase):
     """
@@ -210,6 +212,54 @@ class MethodicalTests(TestCase):
         self.assertEqual(m._x, 3)
 
 
+    def test_outputWithSubsetOfArguments(self):
+        """
+        Inputs pass arguments that output will accept.
+        """
+        class Mechanism(object):
+            m = MethodicalMachine()
+            @m.input()
+            def input(self, x, y=1):
+                "an input"
+            @m.state(initial=True)
+            def state(self):
+                "a state"
+            @m.output()
+            def outputX(self, x):
+                self._x = x
+                return x
+            @m.output()
+            def outputY(self, y):
+                self._y = y
+                return y
+            @m.output()
+            def outputNoArgs(self):
+                return None
+            state.upon(input, state, [outputX, outputY, outputNoArgs])
+
+        m = Mechanism()
+
+        # Pass x as positional argument.
+        self.assertEqual(m.input(3), [3, 1, None])
+        self.assertEqual(m._x, 3)
+        self.assertEqual(m._y, 1)
+
+        # Pass x as key word argument.
+        self.assertEqual(m.input(x=4), [4, 1, None])
+        self.assertEqual(m._x, 4)
+        self.assertEqual(m._y, 1)
+
+        # Pass y as positional argument.
+        self.assertEqual(m.input(6, 3), [6, 3, None])
+        self.assertEqual(m._x, 6)
+        self.assertEqual(m._y, 3)
+
+        # Pass y as key word argument.
+        self.assertEqual(m.input(5, y=2), [5, 2, None])
+        self.assertEqual(m._x, 5)
+        self.assertEqual(m._y, 2)
+
+
     def test_inputFunctionsMustBeEmpty(self):
         """
         The wrapped input function must have an empty body.
@@ -290,7 +340,6 @@ class MethodicalTests(TestCase):
         MechanismWithDocstringAndReturnsNone().input()
 
 
-
     def test_inputOutputMismatch(self):
         """
         All the argument lists of the outputs for a given input must match; if
@@ -315,6 +364,37 @@ class MethodicalTests(TestCase):
                                                 outputThatDoesntMatch])
             self.assertIn("nameOfInput", str(cm.exception))
             self.assertIn("outputThatDoesntMatch", str(cm.exception))
+
+
+    def test_getArgNames(self):
+        """
+        Type annotations should be included in the set of
+        """
+        spec = ArgSpec(
+            args=('a', 'b'),
+            varargs=None,
+            varkw=None,
+            defaults=None,
+            kwonlyargs=(),
+            kwonlydefaults=None,
+            annotations=(('a', int), ('b', str)),
+        )
+        self.assertEqual(
+            _getArgNames(spec),
+            {'a', 'b', ('a', int), ('b', str)},
+        )
+
+
+    def test_filterArgs(self):
+        """
+        filterArgs() should not filter the `args` parameter
+        if outputSpec accepts `*args`.
+        """
+        inputSpec = _getArgSpec(lambda *args, **kwargs: None)
+        outputSpec = _getArgSpec(lambda *args, **kwargs: None)
+        argsIn = ()
+        argsOut, _ = _filterArgs(argsIn, {}, inputSpec, outputSpec)
+        self.assertIs(argsIn, argsOut)
 
 
     def test_multipleInitialStatesFailure(self):
@@ -357,6 +437,7 @@ class MethodicalTests(TestCase):
             start.upon(event, enter=end, outputs=[])
             with self.assertRaises(ValueError):
                 start.upon(event, enter=end, outputs=[])
+
 
     def test_badTransitionForCurrentState(self):
         """
@@ -424,6 +505,7 @@ class MethodicalTests(TestCase):
                 "some-value": 1,
             }
         )
+
 
     def test_restoreState(self):
         """
