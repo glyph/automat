@@ -9,7 +9,13 @@
 Automat is a library for concise, idiomatic Python expression of finite-state
 automata (particularly deterministic finite-state transducers).
 
-Read more here or on [Read the Docs](http://automat.readthedocs.io/).
+Read more here, or on [Read the Docs](https://automat.readthedocs.io/), or watch the following videos for an overview and presentation
+
+Overview and presentation by **Glyph Lefkowitz** at the first talk of the first Pyninsula meetup, on February 21st, 2017:
+[![Glyph Lefkowitz - Automat - Pyninsula #0](https://img.youtube.com/vi/0wOZBpD1VVk/0.jpg)](https://www.youtube.com/watch?v=0wOZBpD1VVk)
+
+Presentation by **Clinton Roy** at PyCon Australia, on August 6th 2017:
+[![Clinton Roy - State Machines - Pycon Australia 2017](https://img.youtube.com/vi/TedUKXhu9kE/0.jpg)](https://www.youtube.com/watch?v=TedUKXhu9kE)
 
 ### Why use state machines? ###
 
