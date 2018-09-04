@@ -11,11 +11,6 @@ matrix:
     - python: pypy
       env: TOX_ENV=pypy-noextras
 
-#    - python: 3.3
-#      env: TOX_ENV=py33-extras
-#    - python: 3.3
-#      env: TOX_ENV=py33-noextras
-
     - python: 3.4
       env: TOX_ENV=py34-extras
     - python: 3.4

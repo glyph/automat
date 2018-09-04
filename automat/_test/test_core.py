@@ -46,11 +46,11 @@ class CoreTests(TestCase):
         """
         a = Automaton()
         a.addTransition("beginning", "begin", "ending", ["end"])
-        self.assertEqual(a.inputAlphabet(), set(["begin"]))
-        self.assertEqual(a.outputAlphabet(), set(["end"]))
+        self.assertEqual(a.inputAlphabet(), {"begin"})
+        self.assertEqual(a.outputAlphabet(), {"end"})
         self.assertEqual(a.outputForInput("beginning", "begin"),
                          ("ending", ["end"]))
-        self.assertEqual(a.states(), set(["beginning", "ending"]))
+        self.assertEqual(a.states(), {"beginning", "ending"})
 
 
     def test_oneTransition_nonIterableOutputs(self):

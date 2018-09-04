@@ -94,8 +94,8 @@ class Automaton(object):
         """
         The full set of symbols acceptable to this automaton.
         """
-        return set(inputSymbol for (inState, inputSymbol, outState,
-                                    outputSymbol) in self._transitions)
+        return {inputSymbol for (inState, inputSymbol, outState,
+                                 outputSymbol) in self._transitions}
 
 
     def outputAlphabet(self):
