@@ -2,7 +2,7 @@
 
 [![Documentation Status](https://readthedocs.org/projects/automat/badge/?version=stable)](http://automat.readthedocs.io/en/latest/)
 [![Build Status](https://travis-ci.org/glyph/automat.svg?branch=master)](https://travis-ci.org/glyph/automat)
-[![Coverage Status](https://coveralls.io/repos/glyph/automat/badge.png)](https://coveralls.io/r/glyph/automat)
+[![Coverage Status](https://api.codacy.com/project/badge/Coverage/cafd4b28859e47b397b2d6e37f7c94bf)](https://www.codacy.com/app/glyph/automat?utm_source=github.com&utm_medium=referral&utm_content=glyph/automat&utm_campaign=Badge_Coverage)
 
 ## Self-service finite-state machines for the programmer on the go. ##
 
