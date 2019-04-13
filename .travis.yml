@@ -25,14 +25,17 @@ matrix:
       env: TOX_ENV=py36-extras
     - python: 3.6
       env: TOX_ENV=py36-noextras
+branches:
+  only:
+    - master
 
 install:
     - sudo apt-get install graphviz
-    - pip install tox coveralls
+    - pip install tox codacy-coverage
 
 script:
     - tox -e $TOX_ENV
 
 after_success:
     - tox -e coverage-report
-    - coveralls
+    - python-codacy-coverage -r coverage.xml
