@@ -30,9 +30,15 @@ install:
     - sudo apt-get install graphviz
     - pip install tox coveralls
 
+before_script:
+    - curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > ./cc-test-reporter
+    - chmod +x ./cc-test-reporter
+    - ./cc-test-reporter before-build
+
 script:
     - tox -e $TOX_ENV
 
-after_success:
+after_script:
     - tox -e coverage-report
     - coveralls
+    - ./cc-test-reporter after-build --exit-code $TRAVIS_TEST_RESULT
