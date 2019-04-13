@@ -38,9 +38,4 @@ script:
 
 after_success:
     - tox -e coverage-report
-    - sonar-scanner \
-  -Dsonar.projectKey=glyph_automat \
-  -Dsonar.organization=glyph-github \
-  -Dsonar.sources=. \
-  -Dsonar.host.url=https://sonarcloud.io \
-  -Dsonar.login=a21096e56e9219b2699a993c8c8f68982e703f90
+    - "sonar-scanner -Dsonar.projectKey=glyph_automat -Dsonar.organization=glyph-github -Dsonar.sources=. -Dsonar.host.url=https://sonarcloud.io/"
