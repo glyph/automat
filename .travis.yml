@@ -46,4 +46,4 @@ script:
 after_script:
     - tox -e coverage-report
     - coveralls
-    - ./cc-test-reporter after-build -f coverage.py --exit-code $TRAVIS_TEST_RESULT
+    - ./cc-test-reporter after-build -t coverage.py --exit-code $TRAVIS_TEST_RESULT
