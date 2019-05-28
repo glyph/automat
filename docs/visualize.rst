@@ -52,7 +52,7 @@ And the following state machine defined in `machine.py`
             Change state
             """
 
-        @_machine.input()
+        @_machine.output()
         def output_on_change_state(self):
             """
             Change state
