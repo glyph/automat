@@ -1,6 +1,6 @@
 # Automat #
 
-[![Documentation Status](https://readthedocs.org/projects/automat/badge/?version=stable)](http://automat.readthedocs.io/en/latest/)
+[![Documentation Status](https://readthedocs.org/projects/automat/badge/?version=latest)](http://automat.readthedocs.io/en/latest/)
 [![Build Status](https://travis-ci.org/glyph/automat.svg?branch=master)](https://travis-ci.org/glyph/automat)
 [![Coverage Status](https://coveralls.io/repos/glyph/automat/badge.png)](https://coveralls.io/r/glyph/automat)
 
