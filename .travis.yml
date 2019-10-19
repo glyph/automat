@@ -16,11 +16,6 @@ matrix:
     - python: pypy
       env: TOX_ENV=pypy-noextras
 
-    - python: 3.4
-      env: TOX_ENV=py34-extras
-    - python: 3.4
-      env: TOX_ENV=py34-noextras
-
     - python: 3.5
       env: TOX_ENV=py35-extras
     - python: 3.5
@@ -30,6 +25,20 @@ matrix:
       env: TOX_ENV=py36-extras
     - python: 3.6
       env: TOX_ENV=py36-noextras
+
+    - python: 3.7
+      env: TOX_ENV=py37-extras
+    - python: 3.7
+      env: TOX_ENV=py37-noextras
+
+    - python: 3.8
+      env: TOX_ENV=py38-extras
+    - python: 3.8
+      env: TOX_ENV=py38-noextras
+
+jobs:
+  allow_failures:
+    - python: 3.8
 
 install:
     - sudo apt-get install graphviz
