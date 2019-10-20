@@ -36,10 +36,6 @@ matrix:
     - python: 3.8
       env: TOX_ENV=py38-noextras
 
-jobs:
-  allow_failures:
-    - python: 3.8
-
 install:
     - sudo apt-get install graphviz
     - pip install tox coveralls

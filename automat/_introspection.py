@@ -13,6 +13,9 @@ def copycode(template, changes):
     ]
     if hasattr(code, "co_kwonlyargcount"):
         names.insert(1, "kwonlyargcount")
+    if hasattr(code, "co_posonlyargcount"):
+        # PEP 570 added "positional only arguments"
+        names.insert(1, "posonlyargcount")
     values = [
         changes.get(name, getattr(template, "co_" + name))
         for name in names
