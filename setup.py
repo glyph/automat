@@ -27,7 +27,7 @@ setup(
         'm2r',
     ],
     install_requires=[
-        "attrs>=16.1.0",
+        "attrs>=19.2.0",
         "six",
     ],
     extras_require={
