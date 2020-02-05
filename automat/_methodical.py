@@ -206,7 +206,7 @@ def _filterArgs(args, kwargs, inputSpec, outputSpec):
     return return_args, return_kwargs
 
 
-@attr.s(cmp=False, hash=False)
+@attr.s(eq=False, hash=False)
 class MethodicalInput(object):
     """
     An input for a L{MethodicalMachine}.
@@ -285,7 +285,7 @@ class MethodicalOutput(object):
     def _name(self):
         return self.method.__name__
 
-@attr.s(cmp=False, hash=False)
+@attr.s(eq=False, hash=False)
 class MethodicalTracer(object):
     automaton = attr.ib(repr=False)
     symbol = attr.ib(repr=False)
