@@ -62,6 +62,7 @@ def sampleMachine():
 
 
 @skipIf(not isGraphvizModuleInstalled(), "Graphviz module is not installed.")
+@skipIf(not isTwistedInstalled(), "Twisted is not installed.")
 class ElementMakerTests(TestCase):
     """
     L{elementMaker} generates HTML representing the specified element.
@@ -134,6 +135,7 @@ def isLeaf(element):
 
 
 @skipIf(not isGraphvizModuleInstalled(), "Graphviz module is not installed.")
+@skipIf(not isTwistedInstalled(), "Twisted is not installed.")
 class TableMakerTests(TestCase):
     """
     Tests that ensure L{tableMaker} generates HTML tables usable as
@@ -214,6 +216,7 @@ class TableMakerTests(TestCase):
 
 @skipIf(not isGraphvizModuleInstalled(), "Graphviz module is not installed.")
 @skipIf(not isGraphvizInstalled(), "Graphviz tools are not installed.")
+@skipIf(not isTwistedInstalled(), "Twisted is not installed.")
 class IntegrationTests(TestCase):
     """
     Tests which make sure Graphviz can understand the output produced by
@@ -232,6 +235,7 @@ class IntegrationTests(TestCase):
 
 
 @skipIf(not isGraphvizModuleInstalled(), "Graphviz module is not installed.")
+@skipIf(not isTwistedInstalled(), "Twisted is not installed.")
 class SpotChecks(TestCase):
     """
     Tests to make sure that the output contains salient features of the machine
