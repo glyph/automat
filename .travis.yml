@@ -6,15 +6,10 @@ branches:
 
 matrix:
   include:
-    - python: 2.7
-      env: TOX_ENV=py27-extras
-    - python: 2.7
-      env: TOX_ENV=py27-noextras
-
-    - python: pypy
-      env: TOX_ENV=pypy-extras
-    - python: pypy
-      env: TOX_ENV=pypy-noextras
+    - python: pypy3
+      env: TOX_ENV=pypy3-extras
+    - python: pypy3
+      env: TOX_ENV=pypy3-noextras
 
     - python: 3.5
       env: TOX_ENV=py35-extras
