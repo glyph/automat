@@ -23,7 +23,7 @@ setup(
     packages=find_packages(exclude=[]),
     package_dir={'automat': 'automat'},
     setup_requires=[
-        'setuptools-scm',
+        'setuptools-scm<6.0.0',
         'm2r',
     ],
     install_requires=[
