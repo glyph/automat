@@ -55,3 +55,4 @@ You can read more about state machines and their advantages for Python programme
    visualize
    api
    debugging
+   typing
