@@ -410,6 +410,10 @@ Now, let's just add an input that lets us tell if the switch is on or not.
 
 .. code-block:: python
 
+    from operator import itemgetter
+
+    first = itemgetter(0)
+
     class LightSwitch(object):
         _machine = MethodicalMachine()
 
@@ -418,16 +422,21 @@ Now, let's just add an input that lets us tell if the switch is on or not.
         @_machine.input()
         def query_power(self):
             "return True if powered, False otherwise"
+
         @_machine.output()
         def _is_powered(self):
             return True
+
         @_machine.output()
         def _not_powered(self):
             return False
-        on_state.upon(query_power, enter=on_state, outputs=[_is_powered],
-                      collector=next)
-        off_state.upon(query_power, enter=off_state, outputs=[_not_powered],
-                       collector=next)
+
+        on_state.upon(
+            query_power, enter=on_state, outputs=[_is_powered], collector=first
+        )
+        off_state.upon(
+            query_power, enter=off_state, outputs=[_not_powered], collector=first
+        )
 
 
 To save the state, we have the `MethodicalMachine.serializer()` method.
