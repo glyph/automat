@@ -91,7 +91,7 @@ class MethodicalState(object):
     method = attr.ib()
     serialized = attr.ib(repr=False)
 
-    def upon(self, input, enter, outputs, collector=list):
+    def upon(self, input, enter=None, outputs=None, collector=list):
         """
         Declare a state transition within the :class:`automat.MethodicalMachine`
         associated with this :class:`automat.MethodicalState`:
@@ -110,6 +110,10 @@ class MethodicalState(object):
         :raises ValueError: if the state transition from `self` via `input`
             has already been defined.
         """
+        if enter is None:
+            enter = self
+        if outputs is None:
+            outputs = []
         inputArgs = _getArgNames(input.argSpec)
         for output in outputs:
             outputArgs = _getArgNames(output.argSpec)
