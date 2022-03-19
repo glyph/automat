@@ -35,23 +35,23 @@ class ClassClusterInstance(Generic[InputsProto, StateCore]):
 
     _builder: ClassClusterBuilder[InputsProto, StateCore]
     _stateCore: StateCore
-    _currentState: UserStateType
     _transitioner: Transitioner
     _stateCluster: Dict[str, UserStateType] = field(default_factory=dict)
 
     def __getattr__(self, inputMethodName: str) -> Callable[..., object]:
         def method(*a, **kw) -> object:
             # We enforce only-a-single-output.
+            currentState = self._transitioner._state
             [[outputMethodName], tracer] = self._transitioner.transition(
                 inputMethodName
             )
-            currentState = self._currentState
-            # TODO: state value
-            realMethod = getattr(currentState, outputMethodName)
+            stateObject = self._stateCluster[currentState] = (
+                self._stateCluster[currentState]
+                if currentState in self._stateCluster
+                else self._builder._stateFactories[currentState](self._stateCore)
+            )
+            realMethod = getattr(stateObject, outputMethodName)
             result = realMethod(*a, **kw)
-            self._currentState = self._builder._stateFactories[
-                self._transitioner._state
-            ](self._stateCore)
             return result
 
         method.__name__ = inputMethodName
@@ -62,8 +62,7 @@ class ClassClusterInstance(Generic[InputsProto, StateCore]):
 class ClassClusterBuilder(Generic[InputsProto, StateCore]):
 
     buildCore: Callable[..., StateCore]
-    initialStateFactory: Callable[[StateCore], UserStateType]
-
+    _initalState: Type[UserStateType]
     _stateFactories: Dict[str, Callable[[StateCore], UserStateType]] = field(
         default_factory=dict
     )
@@ -73,13 +72,10 @@ class ClassClusterBuilder(Generic[InputsProto, StateCore]):
         """
         Create an inputs proto
         """
-        core = self.buildCore(*initArgs, **initKwargs)
-        initialState = self.initialStateFactory(core)
         result = ClassClusterInstance(
             self,
-            core,
-            initialState,
-            Transitioner(self._automaton, type(initialState).__name__),
+            self.buildCore(*initArgs, **initKwargs),
+            Transitioner(self._automaton, self._initalState.__name__),
         )
         return result  # type: ignore
 
