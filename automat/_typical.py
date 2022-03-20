@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import (
     Any,
     Dict,
+    List,
     Generic,
     TypeVar,
     Callable,
@@ -16,7 +17,7 @@ from typing import (
 from ._core import Transitioner, Automaton
 
 
-InputsProto = TypeVar("InputsProto")
+InputsProto = TypeVar("InputsProto", covariant=True)
 UserStateType = object
 StateCore = TypeVar("StateCore")
 OutputResult = TypeVar("OutputResult")
@@ -79,13 +80,13 @@ class ClassClusterBuilder(Generic[InputsProto, StateCore]):
         )
         return result  # type: ignore
 
-    def state(self, stateType: Type[UserStateType]) -> ClusterStateBuilder:
-        return ClusterStateBuilder(self, stateType)
+    def state(self, stateType: Type[UserStateType]) -> BuildOneState:
+        return BuildOneState(self, stateType)
 
 
 @dataclass
-class ClusterStateBuilder(object):
-    _builder: ClusterStateBuilder
+class BuildOneState(Generic[InputsProto, StateCore]):
+    _builder: ClassClusterBuilder[InputsProto, StateCore]
     _stateType: Type[UserStateType]
 
     def upon(
@@ -93,7 +94,7 @@ class ClusterStateBuilder(object):
         method: InputMethod,
         output: InputMethod,
         enter: Optional[Type[UserStateType]] = None,
-    ) -> ClusterStateBuilder:
+    ) -> BuildOneState:
         if enter is None:
             enter = self._stateType
         name = method.__name__
@@ -107,6 +108,81 @@ class ClusterStateBuilder(object):
             [output.__name__],
         )
         return self
+
+
+OneInputType = TypeVar("OneInputType", bound=Callable[..., Any])
+T = TypeVar("T")
+InputCallable = TypeVar("InputCallable")
+OutputCallable = TypeVar("OutputCallable")
+
+
+@dataclass
+class ClusterStateDecorator(Generic[InputsProto, StateCore]):
+    """
+    Decorator-based interface.
+    """
+
+    _buildCore: Callable[[], StateCore]
+    _stateClasses: List[Type[object]] = field(default_factory=list)
+    _builder: Optional[ClassClusterBuilder[InputsProto, StateCore]] = None
+
+    def _finish(self, builder: ClassClusterBuilder[InputsProto, StateCore]) -> None:
+        """
+        Transfer state class declarations into underlying state machine.
+        """
+        for stateClass in self._stateClasses:
+            for x in dir(stateClass):
+                output = getattr(stateClass, x)
+                ah = getattr(output, "__automat_handler__", None)
+                if ah is None:
+                    continue
+                [method, enter] = ah
+                newStateType = stateClass if enter is None else enter()
+                name = method.__name__
+                builder._stateFactories[newStateType.__name__] = newStateType
+                # todo: method & output ought to have matching signatures (modulo
+                # 'self' of a different type)
+                builder._automaton.addTransition(
+                    stateClass.__name__,
+                    method.__name__,
+                    newStateType.__name__,
+                    [output.__name__],
+                )
+
+    def build(self, *initArgs: object, **initKwargs) -> InputsProto:
+        """
+        Initialize the state transitions if necessary, then build.
+        """
+        if self._builder is None:
+            self._builder = builder = ClassClusterBuilder[InputsProto, StateCore](
+                self._buildCore, self._stateClasses[0]
+            )
+            self._finish(builder)
+        else:
+            builder = self._builder
+        return self._builder.build(*initArgs, **initKwargs)
+
+    def state(self, stateClass: Type[T]) -> Type[T]:
+        """
+        Decorate a state class to note that it's a state.
+        """
+        self._stateClasses.append(stateClass)
+        return stateClass
+
+    # TODO: when typing.Concatenate works on mypy, update this signature to
+    # enforce the relationship between InputCallable and OutputCallable
+    def handle(
+        self, input: InputCallable, enter: Optional[Callable[[], object]] = None
+    ) -> Callable[[OutputCallable], OutputCallable]:
+        """
+        Define an input handler.
+        """
+
+        def decorator(c: OutputCallable) -> OutputCallable:
+            c.__automat_handler__ = [input, enter]  # type: ignore
+            return c
+
+        return decorator
 
 
 if __name__ == "__main__":
@@ -123,53 +199,42 @@ if __name__ == "__main__":
         heat: int
         beans: Optional[object] = None
 
-    # @stateful(Button) # alternate?
+    CoffeeStateMachine: ClusterStateDecorator[
+        CoffeeMachine, BrewerStateCore
+    ] = ClusterStateDecorator(lambda: BrewerStateCore(0))
+
+    @CoffeeStateMachine.state
     @dataclass
-    class BeanHaver(object):
+    class BeanHaver:
         core: BrewerStateCore
 
-        # @handle(Button.put_in_beans, enter=lambda: NoBeanHaver) # alternate?
+        @CoffeeStateMachine.handle(CoffeeMachine.brew_button, enter=lambda: NoBeanHaver)
         def heat_the_heating_element(self) -> None:
             self.core.heat += 1
             print("yay brewing beans")
 
-    # @stateful(Button) # alternate?
+        @CoffeeStateMachine.handle(CoffeeMachine.put_in_beans, enter=lambda: BeanHaver)
+        def too_many_beans(self, beans: object) -> None:
+            print("beans overflowing", beans)
+
+    @CoffeeStateMachine.state
     @dataclass
     class NoBeanHaver(object):
         core: BrewerStateCore
 
+        @CoffeeStateMachine.handle(CoffeeMachine.brew_button)
         def no_beans(self) -> None:
             print("no beans, not heating")
 
+        @CoffeeStateMachine.handle(CoffeeMachine.put_in_beans, enter=lambda: BeanHaver)
         def add_beans(self, beans) -> None:
             print("put in some beans")
             self.core.beans = beans
 
-    builder = ClassClusterBuilder[CoffeeMachine, BrewerStateCore](
-        lambda: BrewerStateCore(0), BeanHaver
-    )
-    (
-        builder.state(BeanHaver).upon(
-            CoffeeMachine.brew_button,
-            BeanHaver.heat_the_heating_element,
-            NoBeanHaver,
-        )
-    )
-    (
-        builder.state(NoBeanHaver)
-        .upon(
-            CoffeeMachine.brew_button,
-            NoBeanHaver.no_beans,
-        )
-        .upon(
-            CoffeeMachine.put_in_beans,
-            NoBeanHaver.add_beans,
-            BeanHaver,
-        )
-    )
-    x: CoffeeMachine = builder.build()
+    x: CoffeeMachine = CoffeeStateMachine.build()
     x.brew_button()
     x.brew_button()
     x.put_in_beans("beans")
+    x.put_in_beans("oops too many beans")
     x.brew_button()
     x.brew_button()
