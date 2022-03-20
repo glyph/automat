@@ -136,6 +136,8 @@ class ClusterStateDecorator(Generic[InputsProto, StateCore]):
                 ah = getattr(output, "__automat_handler__", None)
                 if ah is None:
                     continue
+                method: Callable[..., object]
+                enter: Optional[Callable[[], Type[object]]]
                 [method, enter] = ah
                 newStateType = stateClass if enter is None else enter()
                 name = method.__name__
@@ -172,8 +174,13 @@ class ClusterStateDecorator(Generic[InputsProto, StateCore]):
     # TODO: when typing.Concatenate works on mypy, update this signature to
     # enforce the relationship between InputCallable and OutputCallable
     def handle(
-        self, input: InputCallable, enter: Optional[Callable[[], object]] = None
-    ) -> Callable[[OutputCallable], OutputCallable]:
+        self,
+        input: InputCallable,  # wants to be: Callable[Concatenate[SelfA, P], R]
+        enter: Optional[Callable[[], Type[object]]] = None,
+    ) -> Callable[
+        [OutputCallable],  # wants to be: [Callable[Concatenate[SelfB, P], R]],
+        OutputCallable,  # wants to be: Callable[Concatenate[SelfB, P], R]
+    ]:
         """
         Define an input handler.
         """
