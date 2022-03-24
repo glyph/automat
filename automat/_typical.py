@@ -40,6 +40,9 @@ class ClassClusterInstance(Generic[InputsProto, StateCore]):
     _stateCluster: Dict[str, UserStateType] = field(default_factory=dict)
 
     def __getattr__(self, inputMethodName: str) -> Callable[..., object]:
+        # TODO: this could all be done ahead of time by building an actual type
+        # object with methods populated, no need to dynamically (slowly) build
+        # function objects on each method call
         def method(*a, **kw) -> object:
             # We enforce only-a-single-output.
             currentState = self._transitioner._state
@@ -79,35 +82,6 @@ class ClassClusterBuilder(Generic[InputsProto, StateCore]):
             Transitioner(self._automaton, self._initalState.__name__),
         )
         return result  # type: ignore
-
-    def state(self, stateType: Type[UserStateType]) -> BuildOneState:
-        return BuildOneState(self, stateType)
-
-
-@dataclass
-class BuildOneState(Generic[InputsProto, StateCore]):
-    _builder: ClassClusterBuilder[InputsProto, StateCore]
-    _stateType: Type[UserStateType]
-
-    def upon(
-        self,
-        method: InputMethod,
-        output: InputMethod,
-        enter: Optional[Type[UserStateType]] = None,
-    ) -> BuildOneState:
-        if enter is None:
-            enter = self._stateType
-        name = method.__name__
-        self._builder._stateFactories[enter.__name__] = enter
-        # todo: method & output ought to have matching signatures (modulo
-        # 'self' of a different type)
-        self._builder._automaton.addTransition(
-            self._stateType.__name__,
-            method.__name__,
-            enter.__name__,
-            [output.__name__],
-        )
-        return self
 
 
 OneInputType = TypeVar("OneInputType", bound=Callable[..., Any])
@@ -169,6 +143,13 @@ class ClusterStateDecorator(Generic[InputsProto, StateCore]):
         Decorate a state class to note that it's a state.
         """
         self._stateClasses.append(stateClass)
+        return stateClass
+
+    def initial(self, stateClass: Type[T]) -> Type[T]:
+        """
+        Decorate a state class to note that it's the initial state.
+        """
+        self._stateClasses.insert(0, stateClass)
         return stateClass
 
     # TODO: when typing.Concatenate works on mypy, update this signature to
@@ -237,6 +218,12 @@ if __name__ == "__main__":
         def add_beans(self, beans) -> None:
             print("put in some beans")
             self.core.beans = beans
+
+    """
+    Need a better example that has a start, handshake, and established state
+    class, and the established state class can have a reference to an instance
+    of the handshake state class, and can thereby access its state.
+    """
 
     x: CoffeeMachine = CoffeeStateMachine.build()
     x.brew_button()
