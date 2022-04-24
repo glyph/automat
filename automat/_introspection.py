@@ -6,6 +6,8 @@ from types import CodeType as code, FunctionType as function
 
 
 def copycode(template, changes):
+    if hasattr(code, "replace"):
+        return template.replace(**{"co_" + k : v for k, v in changes.items()})
     names = [
         "argcount", "nlocals", "stacksize", "flags", "code", "consts",
         "names", "varnames", "filename", "name", "firstlineno", "lnotab",
@@ -21,7 +23,6 @@ def copycode(template, changes):
         for name in names
     ]
     return code(*values)
-
 
 
 def copyfunction(template, funcchanges, codechanges):
