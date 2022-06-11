@@ -32,12 +32,12 @@ def _getArgSpec(func):
         varargs=spec.varargs,
         varkw=spec.varkw,
         defaults=spec.defaults if spec.defaults else (),
-        kwonlyargs=tuple(spec.kwonlyargs) if six.PY3 else (),
+        kwonlyargs=tuple(spec.kwonlyargs),
         kwonlydefaults=(
             tuple(spec.kwonlydefaults.items())
             if spec.kwonlydefaults else ()
         ),
-        annotations=tuple(spec.annotations.items()) if six.PY3 else (),
+        annotations=tuple(spec.annotations.items()),
     )
 
 
