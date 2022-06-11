@@ -11,13 +11,12 @@ setup(
     description="""
     Self-service finite-state machines for the programmer on the go.
     """.strip(),
-    long_description=long_description,
+    readme='README.md',
     packages=find_packages(exclude=[]),
     package_dir={'automat': 'automat'},
     setup_requires=[
-        'setuptools-scm',
-        'm2r',
         'wheel',
+        'setuptools-scm',
     ],
     install_requires=[
         "attrs>=19.2.0",
