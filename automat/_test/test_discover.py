@@ -6,9 +6,6 @@ import textwrap
 import tempfile
 from unittest import skipIf, TestCase
 
-import six
-
-
 def isTwistedInstalled():
     try:
         __import__('twisted')
@@ -43,7 +40,7 @@ class _WritesPythonModules(TestCase):
         super(_WritesPythonModules, self).tearDown()
 
         sys.path[:] = self.savedSysPath
-        modulesToDelete = six.viewkeys(sys.modules) - self.originalSysModules
+        modulesToDelete = sys.modules.keys() - self.originalSysModules
         for module in modulesToDelete:
             del sys.modules[module]
 

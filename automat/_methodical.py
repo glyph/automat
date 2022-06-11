@@ -4,15 +4,9 @@ import collections
 from functools import wraps
 from itertools import count
 
-try:
-    # Python 3
-    from inspect import getfullargspec as getArgsSpec
-except ImportError:
-    # Python 2
-    from inspect import getargspec as getArgsSpec
+from inspect import getfullargspec as getArgsSpec
 
 import attr
-import six
 
 from ._core import Transitioner, Automaton
 from ._introspection import preserveName
@@ -36,13 +30,13 @@ def _getArgSpec(func):
     return ArgSpec(
         args=tuple(spec.args),
         varargs=spec.varargs,
-        varkw=spec.varkw if six.PY3 else spec.keywords,
+        varkw=spec.varkw,
         defaults=spec.defaults if spec.defaults else (),
         kwonlyargs=tuple(spec.kwonlyargs) if six.PY3 else (),
         kwonlydefaults=(
             tuple(spec.kwonlydefaults.items())
             if spec.kwonlydefaults else ()
-        ) if six.PY3 else (),
+        ),
         annotations=tuple(spec.annotations.items()) if six.PY3 else (),
     )
 
