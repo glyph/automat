@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from inspect import get_annotations, signature
+from inspect import Signature, get_annotations, signature
 from typing import (
     Any,
     Callable,
@@ -39,7 +39,48 @@ class HasName(Protocol):
 InputMethod = TypeVar("InputMethod", bound=HasName)
 
 
-def _dobuild(
+def _magicValueForParameter(
+    pname: str,
+    ptype: Type[object],
+    transitionSignature: Signature,
+    passedParams: Dict[str, object],
+    stateCore: object,
+    existingStateCluster: Mapping[str, object],
+) -> object:
+    """
+    When a state requires an attribute to be constructed, automatically
+    determine where that attribute might need to come from, which may be one
+    of:
+
+        1. If a parameter of a matching name and type is passed in to the
+           method causing the state transition, pass that along.
+
+        2. If an attribute of a matching name and type is present on the state
+           core object, pass it along.
+
+        3. If it's the type of one of the other state objects, and it's already
+           been populated,
+    """
+    # TODO: this needs to do some prechecking so we don't get runtime errors if
+    # we can avoid it; specifically we can import-time check to see if there
+    # are any transition paths into a state (B) that requires another state (A)
+    # which do not pass through the required state (A), and checking the
+    # matching name/type annotations on both the state core and the transition
+    # methods.
+    if pname in transitionSignature.parameters:
+        transitionParam = transitionSignature.parameters[pname]
+        # type-matching, check for Any, check for lacking annotation?
+        if transitionParam.annotation == ptype:
+            return passedParams[pname]
+    if (it := getattr(stateCore, pname, None)) is not None:
+        return it
+    # TODO: better keys for existingStateCluster
+    if ptype.__name__ in existingStateCluster:
+        return existingStateCluster[ptype.__name__]
+    raise RuntimeError("oops no param", pname, ptype)
+
+
+def _buildNewState(
     transitionMethod: Any,
     stateFactory: Callable[..., Any],
     stateCore: object,
@@ -53,26 +94,20 @@ def _dobuild(
     passedParams = transitionSignature.bind(stateCore, *args, **kwargs).arguments
     factorySignature = signature(stateFactory, eval_str=True)
     expectedParams = factorySignature.parameters
+
     for extra_param in (
         expectedParams[each] for each in list(expectedParams.keys())[1:]
     ):
-        ptype = extra_param.annotation
-        pname = extra_param.name
+        param_name = extra_param.name
+        k[param_name] = _magicValueForParameter(
+            param_name,
+            extra_param.annotation,
+            transitionSignature,
+            passedParams,
+            stateCore,
+            existingStateCluster,
+        )
 
-        def _() -> object:
-            if pname in transitionSignature.parameters:
-                transitionParam = transitionSignature.parameters[pname]
-                # type-matching, check for Any, check for lacking annotation?
-                if transitionParam.annotation == ptype:
-                    return passedParams[pname]
-            if (it := getattr(stateCore, pname, None)) is not None:
-                return it
-            # TODO: better keys for existingStateCluster
-            if ptype.__name__ in existingStateCluster:
-                return existingStateCluster[ptype.__name__]
-            raise RuntimeError("oops no param", pname, ptype)
-
-        k[pname] = _()
     return stateFactory(stateCore, **k)
 
 
@@ -98,7 +133,7 @@ class ClassClusterInstance(Generic[InputsProto, StateCore]):
             stateObject = self._stateCluster[currentState] = (
                 self._stateCluster[currentState]
                 if currentState in self._stateCluster
-                else _dobuild(
+                else _buildNewState(
                     getattr(self._builder._stateProtocol, inputMethodName),
                     self._builder._stateFactories[currentState],
                     self._stateCore,
