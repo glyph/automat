@@ -3,24 +3,30 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import (
     Any,
-    Dict,
-    List,
-    Generic,
-    TypeVar,
     Callable,
-    Type,
-    Sequence,
-    Protocol,
+    Concatenate,
+    Dict,
+    Generic,
+    List,
     Optional,
+    ParamSpec,
+    Protocol,
+    Sequence,
+    Type,
+    TypeVar,
 )
 
-from ._core import Transitioner, Automaton
+from ._core import Automaton, Transitioner
 
 
 InputsProto = TypeVar("InputsProto", covariant=True)
 UserStateType = object
 StateCore = TypeVar("StateCore")
 OutputResult = TypeVar("OutputResult")
+SelfA = TypeVar("SelfA")
+SelfB = TypeVar("SelfB")
+R = TypeVar("R")
+P = ParamSpec("P")
 
 
 class HasName(Protocol):
@@ -152,15 +158,12 @@ class ClusterStateDecorator(Generic[InputsProto, StateCore]):
         self._stateClasses.insert(0, stateClass)
         return stateClass
 
-    # TODO: when typing.Concatenate works on mypy, update this signature to
-    # enforce the relationship between InputCallable and OutputCallable
     def handle(
         self,
-        input: InputCallable,  # wants to be: Callable[Concatenate[SelfA, P], R]
+        input: Callable[Concatenate[SelfA, P], R],
         enter: Optional[Callable[[], Type[object]]] = None,
     ) -> Callable[
-        [OutputCallable],  # wants to be: [Callable[Concatenate[SelfB, P], R]],
-        OutputCallable,  # wants to be: Callable[Concatenate[SelfB, P], R]
+        [Callable[Concatenate[SelfB, P], R]], Callable[Concatenate[SelfB, P], R]
     ]:
         """
         Define an input handler.
