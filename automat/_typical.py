@@ -30,6 +30,9 @@ SelfA = TypeVar("SelfA")
 SelfB = TypeVar("SelfB")
 R = TypeVar("R")
 P = ParamSpec("P")
+ThisInputArgs = ParamSpec("ThisInputArgs")
+T = TypeVar("T")
+OutputCallable = TypeVar("OutputCallable")
 
 
 class ProtocolAtRuntime(Protocol[InputsProto]):
@@ -165,7 +168,7 @@ def _updateState(
 class ClassClusterInstance(Generic[InputsProto, StateCore]):
     """ """
 
-    _builder: ClassClusterBuilder[InputsProto, StateCore]
+    _builder: ClassClusterBuilder[InputsProto, StateCore, object]
     _stateCore: StateCore
     _transitioner: Transitioner
     _stateCluster: Dict[str, UserStateType] = field(default_factory=dict)
@@ -198,17 +201,17 @@ class ClassClusterInstance(Generic[InputsProto, StateCore]):
 
 
 @dataclass
-class ClassClusterBuilder(Generic[InputsProto, StateCore]):
+class ClassClusterBuilder(Generic[InputsProto, StateCore, P]):
 
     _stateProtocol: ProtocolAtRuntime[InputsProto]
-    _buildCore: Callable[..., StateCore]
+    _buildCore: Callable[P, StateCore]
     _initalState: Type[UserStateType]
     _stateFactories: Dict[str, Callable[[StateCore], UserStateType]] = field(
         default_factory=dict
     )
     _automaton: Automaton = field(default_factory=Automaton)
 
-    def build(self, *initArgs: object, **initKwargs) -> InputsProto:
+    def build(self, *initArgs: P.args, **initKwargs: P.kwargs) -> InputsProto:
         """
         Create an inputs proto
         """
@@ -220,24 +223,18 @@ class ClassClusterBuilder(Generic[InputsProto, StateCore]):
         return result  # type: ignore
 
 
-OneInputType = TypeVar("OneInputType", bound=Callable[..., Any])
-T = TypeVar("T")
-InputCallable = TypeVar("InputCallable")
-OutputCallable = TypeVar("OutputCallable")
-
-
 @dataclass
-class ClusterStateDecorator(Generic[InputsProto, StateCore]):
+class ClusterStateDecorator(Generic[InputsProto, StateCore, P]):
     """
     Decorator-based interface.
     """
 
     _stateProtocol: ProtocolAtRuntime[InputsProto]
-    _buildCore: Callable[[], StateCore]
+    _buildCore: Callable[P, StateCore]
     _stateClasses: List[Type[object]] = field(default_factory=list)
-    _builder: Optional[ClassClusterBuilder[InputsProto, StateCore]] = None
+    _builder: Optional[ClassClusterBuilder[InputsProto, StateCore, P]] = None
 
-    def _finish(self, builder: ClassClusterBuilder[InputsProto, StateCore]) -> None:
+    def _finish(self, builder: ClassClusterBuilder[InputsProto, StateCore, P]) -> None:
         """
         Transfer state class declarations into underlying state machine.
         """
@@ -262,12 +259,12 @@ class ClusterStateDecorator(Generic[InputsProto, StateCore]):
                     [output.__name__],
                 )
 
-    def build(self, *initArgs: object, **initKwargs) -> InputsProto:
+    def build(self, *initArgs: P.args, **initKwargs: P.kwargs) -> InputsProto:
         """
         Initialize the state transitions if necessary, then build.
         """
         if self._builder is None:
-            self._builder = builder = ClassClusterBuilder[InputsProto, StateCore](
+            self._builder = builder = ClassClusterBuilder(
                 self._stateProtocol, self._buildCore, self._stateClasses[0]
             )
             self._finish(builder)
@@ -299,10 +296,10 @@ class ClusterStateDecorator(Generic[InputsProto, StateCore]):
 
     def handle(
         self,
-        input: Callable[Concatenate[SelfA, P], R],
+        input: Callable[Concatenate[SelfA, ThisInputArgs], R],
         enter: Optional[Callable[[], Type[object]]] = None,
     ) -> Callable[
-        [Callable[Concatenate[SelfB, P], R]], Callable[Concatenate[SelfB, P], R]
+        [Callable[Concatenate[SelfB, ThisInputArgs], R]], Callable[Concatenate[SelfB, ThisInputArgs], R]
     ]:
         """
         Define an input handler.
