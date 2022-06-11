@@ -146,20 +146,23 @@ def _updateState(
     currentState = self._transitioner._state
     stateFactory = self._builder._stateFactories[currentState]
     if currentState in self._stateCluster:
-        return stateFactory, self._stateCluster[currentState]
-    stateObject = self._stateCluster[currentState] = _buildNewState(
-        getattr(self._builder._stateProtocol, inputMethodName)
-        if inputMethodName is not None
-        else None,
-        stateFactory,
-        self._stateCore,
-        a,
-        kw,
-        self._stateCluster,
-    )
+        stateObject = self._stateCluster[currentState]
+    else:
+        stateObject = self._stateCluster[currentState] = _buildNewState(
+            getattr(self._builder._stateProtocol, inputMethodName)
+            if inputMethodName is not None
+            else None,
+            stateFactory,
+            self._stateCore,
+            a,
+            kw,
+            self._stateCluster,
+        )
     if oldState is not None:
+        oldStateFactory = self._builder._stateFactories[oldState]
         if oldState != currentState:
-            if not stateFactory.__persistState__:  # type: ignore
+            shouldOldPersist: bool = oldStateFactory.__persistState__  # type: ignore
+            if not shouldOldPersist:
                 del self._stateCluster[oldState]
     return stateFactory, stateObject
 
@@ -335,9 +338,6 @@ if __name__ == "__main__":
     class NoBeanHaver(object):
         core: BrewerStateCore
 
-        def __post_init__(self) -> None:
-            print("Constructed no-bean-haver.")
-
         @CoffeeStateMachine.handle(CoffeeMachine.brew_button)
         def no_beans(self) -> None:
             print("no beans, not heating")
@@ -347,14 +347,11 @@ if __name__ == "__main__":
             print("put in some beans", repr(beans))
             self.core.beans = beans
 
-    @CoffeeStateMachine.state()
+    @CoffeeStateMachine.state(persist=False)
     @dataclass
     class BeanHaver:
         core: BrewerStateCore
         beans: str
-
-        def __post_init__(self) -> None:
-            print("constructed bean haver with", self.beans)
 
         @CoffeeStateMachine.handle(CoffeeMachine.brew_button, enter=lambda: NoBeanHaver)
         def heat_the_heating_element(self) -> None:
@@ -371,9 +368,7 @@ if __name__ == "__main__":
     of the handshake state class, and can thereby access its state.
     """
 
-    print("building...")
     x: CoffeeMachine = CoffeeStateMachine.build()
-    print("built")
     x.brew_button()
     x.brew_button()
     x.put_in_beans("old beans")
