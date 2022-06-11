@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from inspect import get_annotations, signature
 from typing import (
     Any,
     Callable,
@@ -8,10 +9,12 @@ from typing import (
     Dict,
     Generic,
     List,
+    Mapping,
     Optional,
     ParamSpec,
     Protocol,
     Sequence,
+    Tuple,
     Type,
     TypeVar,
 )
@@ -36,6 +39,43 @@ class HasName(Protocol):
 InputMethod = TypeVar("InputMethod", bound=HasName)
 
 
+def _dobuild(
+    transitionMethod: Any,
+    stateFactory: Callable[..., Any],
+    stateCore: object,
+    args: Tuple[Any, ...],
+    kwargs: Dict[str, object],
+    existingStateCluster: Mapping[str, object],
+) -> Any:
+    """ """
+    k = {}
+    transitionSignature = signature(transitionMethod, eval_str=True, globals=globals())
+    passedParams = transitionSignature.bind(stateCore, *args, **kwargs).arguments
+    factorySignature = signature(stateFactory, eval_str=True)
+    expectedParams = factorySignature.parameters
+    for extra_param in (
+        expectedParams[each] for each in list(expectedParams.keys())[1:]
+    ):
+        ptype = extra_param.annotation
+        pname = extra_param.name
+
+        def _() -> object:
+            if pname in transitionSignature.parameters:
+                transitionParam = transitionSignature.parameters[pname]
+                # type-matching, check for Any, check for lacking annotation?
+                if transitionParam.annotation == ptype:
+                    return passedParams[pname]
+            if (it := getattr(stateCore, pname, None)) is not None:
+                return it
+            # TODO: better keys for existingStateCluster
+            if ptype.__name__ in existingStateCluster:
+                return existingStateCluster[ptype.__name__]
+            raise RuntimeError("oops no param", pname, ptype)
+
+        k[pname] = _()
+    return stateFactory(stateCore, **k)
+
+
 @dataclass
 class ClassClusterInstance(Generic[InputsProto, StateCore]):
     """ """
@@ -58,7 +98,14 @@ class ClassClusterInstance(Generic[InputsProto, StateCore]):
             stateObject = self._stateCluster[currentState] = (
                 self._stateCluster[currentState]
                 if currentState in self._stateCluster
-                else self._builder._stateFactories[currentState](self._stateCore)
+                else _dobuild(
+                    getattr(self._builder._stateProtocol, inputMethodName),
+                    self._builder._stateFactories[currentState],
+                    self._stateCore,
+                    a,
+                    kw,
+                    self._stateCluster,
+                )
             )
             realMethod = getattr(stateObject, outputMethodName)
             result = realMethod(*a, **kw)
@@ -71,7 +118,8 @@ class ClassClusterInstance(Generic[InputsProto, StateCore]):
 @dataclass
 class ClassClusterBuilder(Generic[InputsProto, StateCore]):
 
-    buildCore: Callable[..., StateCore]
+    _stateProtocol: ProtocolAtRuntime[InputsProto]
+    _buildCore: Callable[..., StateCore]
     _initalState: Type[UserStateType]
     _stateFactories: Dict[str, Callable[[StateCore], UserStateType]] = field(
         default_factory=dict
@@ -84,7 +132,7 @@ class ClassClusterBuilder(Generic[InputsProto, StateCore]):
         """
         result = ClassClusterInstance(
             self,
-            self.buildCore(*initArgs, **initKwargs),
+            self._buildCore(*initArgs, **initKwargs),
             Transitioner(self._automaton, self._initalState.__name__),
         )
         return result  # type: ignore
@@ -96,12 +144,18 @@ InputCallable = TypeVar("InputCallable")
 OutputCallable = TypeVar("OutputCallable")
 
 
+class ProtocolAtRuntime(Protocol[InputsProto]):
+    def __call__(self) -> InputsProto:
+        ...
+
+
 @dataclass
 class ClusterStateDecorator(Generic[InputsProto, StateCore]):
     """
     Decorator-based interface.
     """
 
+    _stateProtocol: ProtocolAtRuntime[InputsProto]
     _buildCore: Callable[[], StateCore]
     _stateClasses: List[Type[object]] = field(default_factory=list)
     _builder: Optional[ClassClusterBuilder[InputsProto, StateCore]] = None
@@ -137,7 +191,7 @@ class ClusterStateDecorator(Generic[InputsProto, StateCore]):
         """
         if self._builder is None:
             self._builder = builder = ClassClusterBuilder[InputsProto, StateCore](
-                self._buildCore, self._stateClasses[0]
+                self._stateProtocol, self._buildCore, self._stateClasses[0]
             )
             self._finish(builder)
         else:
@@ -179,7 +233,7 @@ class ClusterStateDecorator(Generic[InputsProto, StateCore]):
 if __name__ == "__main__":
 
     class CoffeeMachine(Protocol):
-        def put_in_beans(self, beans: object) -> None:
+        def put_in_beans(self, beans: str) -> None:
             "put in some beans"
 
         def brew_button(self) -> None:
@@ -190,23 +244,9 @@ if __name__ == "__main__":
         heat: int
         beans: Optional[object] = None
 
-    CoffeeStateMachine: ClusterStateDecorator[
-        CoffeeMachine, BrewerStateCore
-    ] = ClusterStateDecorator(lambda: BrewerStateCore(0))
-
-    @CoffeeStateMachine.state
-    @dataclass
-    class BeanHaver:
-        core: BrewerStateCore
-
-        @CoffeeStateMachine.handle(CoffeeMachine.brew_button, enter=lambda: NoBeanHaver)
-        def heat_the_heating_element(self) -> None:
-            self.core.heat += 1
-            print("yay brewing beans")
-
-        @CoffeeStateMachine.handle(CoffeeMachine.put_in_beans, enter=lambda: BeanHaver)
-        def too_many_beans(self, beans: object) -> None:
-            print("beans overflowing", beans)
+    CoffeeStateMachine = ClusterStateDecorator(
+        CoffeeMachine, lambda: BrewerStateCore(0)
+    )
 
     @CoffeeStateMachine.state
     @dataclass
@@ -221,6 +261,21 @@ if __name__ == "__main__":
         def add_beans(self, beans) -> None:
             print("put in some beans")
             self.core.beans = beans
+
+    @CoffeeStateMachine.state
+    @dataclass
+    class BeanHaver:
+        core: BrewerStateCore
+        beans: str
+
+        @CoffeeStateMachine.handle(CoffeeMachine.brew_button, enter=lambda: NoBeanHaver)
+        def heat_the_heating_element(self) -> None:
+            self.core.heat += 1
+            print("yay brewing beans")
+
+        @CoffeeStateMachine.handle(CoffeeMachine.put_in_beans, enter=lambda: BeanHaver)
+        def too_many_beans(self, beans: object) -> None:
+            print("beans overflowing:", repr(beans))
 
     """
     Need a better example that has a start, handshake, and established state
