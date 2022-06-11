@@ -17,7 +17,7 @@ jobs:
       fail-fast: false
       matrix:
         python: ["3.10"]
-        TOX_ENV: ["lint", "py310-extras", "py310-noextras", "mypy"]
+        TOX_ENV: ["py310-extras", "py310-noextras", "mypy"]
 
     steps:
       - uses: actions/checkout@v3
