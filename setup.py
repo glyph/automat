@@ -4,14 +4,6 @@ Setup file for automat
 
 from setuptools import setup, find_packages
 
-try:
-    from m2r import parse_from_file
-    long_description = parse_from_file('README.md')
-except(IOError, ImportError):
-    print("\n\n!!! m2r not found, long_description is bad, don't upload this to PyPI !!!\n\n")
-    import io
-    long_description = io.open('README.md', encoding="utf-8").read()
-
 setup(
     name='Automat',
     use_scm_version=True,
