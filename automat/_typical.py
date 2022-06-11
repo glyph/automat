@@ -1,25 +1,33 @@
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass, field
-from inspect import Signature, get_annotations, signature
+from inspect import Signature, signature
 from typing import (
     Any,
     Callable,
-    Concatenate,
     Dict,
     Generic,
     List,
     Mapping,
     Optional,
-    ParamSpec,
     Protocol,
     Sequence,
     Tuple,
     Type,
     TypeVar,
+    TYPE_CHECKING,
 )
 
 from ._core import Automaton, Transitioner
+
+if sys.version_info >= (3, 10):
+    from typing import Concatenate, ParamSpec
+    P = ParamSpec("P")
+    ThisInputArgs = ParamSpec("ThisInputArgs")
+else:
+    if not TYPE_CHECKING:
+        P = TypeVar("P")
 
 
 InputsProto = TypeVar("InputsProto", covariant=True)
@@ -29,8 +37,6 @@ OutputResult = TypeVar("OutputResult")
 SelfA = TypeVar("SelfA")
 SelfB = TypeVar("SelfB")
 R = TypeVar("R")
-P = ParamSpec("P")
-ThisInputArgs = ParamSpec("ThisInputArgs")
 T = TypeVar("T")
 OutputCallable = TypeVar("OutputCallable")
 
