@@ -25,6 +25,7 @@ setup(
     setup_requires=[
         'setuptools-scm',
         'm2r',
+        'wheel',
     ],
     install_requires=[
         "attrs>=19.2.0",
