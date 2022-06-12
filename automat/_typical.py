@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import sys
 from dataclasses import dataclass, field
+from enum import Enum
 from functools import wraps
-from inspect import Signature, signature
+from inspect import Parameter, Signature, signature
 from typing import (
     Any,
     Callable,
@@ -12,6 +13,7 @@ from typing import (
     Generic,
     List,
     Mapping,
+    NoReturn,
     Optional,
     Protocol,
     Sequence,
@@ -19,6 +21,7 @@ from typing import (
     Tuple,
     Type,
     TypeVar,
+    overload,
 )
 
 from ._core import Automaton, Transitioner
@@ -35,6 +38,7 @@ else:
 
 
 InputsProto = TypeVar("InputsProto", covariant=True)
+PrivateProto = TypeVar("PrivateProto", covariant=True)
 UserStateType = object
 StateCore = TypeVar("StateCore")
 OutputResult = TypeVar("OutputResult")
@@ -42,7 +46,7 @@ SelfA = TypeVar("SelfA")
 SelfB = TypeVar("SelfB")
 R = TypeVar("R")
 T = TypeVar("T")
-OutputCallable = TypeVar("OutputCallable")
+OutputCallable = TypeVar("OutputCallable", bound=Callable[..., Any])
 
 
 class ProtocolAtRuntime(Protocol[InputsProto]):
@@ -86,6 +90,8 @@ def _magicValueForParameter(
 
         3. If it's the type of one of the other state objects, and it's already
            been populated,
+
+        4. If it's the type of the state core, pass the state core.
     """
     # TODO: this needs to do some prechecking so we don't get runtime errors if
     # we can avoid it; specifically we can import-time check to see if there
@@ -103,6 +109,8 @@ def _magicValueForParameter(
     # TODO: better keys for existingStateCluster
     if ptype.__name__ in existingStateCluster:
         return existingStateCluster[ptype.__name__]
+    if ptype is type(stateCore):
+        return stateCore
     raise CouldNotFindAutoParam(f"Could not find parameter {pname} anywhere.")
 
 
@@ -131,30 +139,29 @@ def _buildNewState(
     factorySignature = signature(stateFactory, eval_str=True)
     expectedParams = factorySignature.parameters
 
-    for extra_param in (
-        expectedParams[each] for each in list(expectedParams.keys())[1:]  # skip `self`
-    ):
-        param_name = extra_param.name
-        k[param_name] = _magicValueForParameter(
-            param_name,
-            extra_param.annotation,
+    for extraParam in expectedParams.values():
+        if extraParam.default is not Parameter.empty:
+            continue
+        paramName = extraParam.name
+        k[paramName] = _magicValueForParameter(
+            paramName,
+            extraParam.annotation,
             transitionSignature,
             passedParams,
             stateCore,
             existingStateCluster,
         )
 
-    return stateFactory(stateCore, **k)
+    return stateFactory(**k)
 
 
 def _updateState(
     oldState: str | None,
     self: _TypicalInstance[InputsProto, StateCore],
-    inputMethodName: Optional[str],
     a: Tuple[object, ...],
     kw: Dict[str, object],
-    stateFactories: Dict[str, Callable[[StateCore], UserStateType]],
-    stateProtocol: ProtocolAtRuntime[InputsProto],
+    stateFactories: Dict[str, Callable[..., UserStateType]],
+    inputMethod: Callable[..., object] | None,
 ) -> Tuple[Any, object]:
     currentState = self._transitioner._state
     stateFactory = stateFactories[currentState]
@@ -162,9 +169,7 @@ def _updateState(
         stateObject = self._stateCluster[currentState]
     else:
         stateObject = self._stateCluster[currentState] = _buildNewState(
-            getattr(stateProtocol, inputMethodName)
-            if inputMethodName is not None
-            else None,
+            inputMethod,
             stateFactory,
             self._stateCore,
             a,
@@ -184,8 +189,8 @@ _baseMethods = set(dir(Protocol))
 
 
 def _bindableTransitionMethod(
-    inputMethod: Callable,
-    stateFactories: Dict[str, Callable[[StateCore], UserStateType]],
+    inputMethod: Callable[..., object],
+    stateFactories: Dict[str, Callable[..., UserStateType]],
     stateProtocol: ProtocolAtRuntime[InputsProto],
 ) -> Callable[..., object]:
     inputMethodName = inputMethod.__name__
@@ -195,12 +200,29 @@ def _bindableTransitionMethod(
         oldState = self._transitioner._state
         stateObject = self._stateCluster[oldState]
         [[outputMethodName], tracer] = self._transitioner.transition(inputMethodName)
-        realMethod = getattr(stateObject, outputMethodName)
-        result = realMethod(*a, **kw)
-        _updateState(
-            oldState, self, inputMethodName, a, kw, stateFactories, stateProtocol
-        )
+        try:
+            if outputMethodName is None:
+                raise RuntimeError("unhandled state transition")
+            else:
+                realMethod = getattr(stateObject, outputMethodName)
+                result = realMethod(*a, **kw)
+        finally:
+            _updateState(oldState, self, a, kw, stateFactories, inputMethod)
         return result
+
+    return method
+
+
+def _bindableDefaultMethod(
+    inputMethod: Callable[..., object],
+    impl: Callable[..., object],
+    includePrivate: bool,
+) -> Callable[..., object]:
+    @wraps(inputMethod)
+    def method(self: _TypicalInstance[InputsProto, StateCore], *a, **kw) -> object:
+        return impl(
+            self, self._stateCore, *([self] if includePrivate else []), *a, **kw
+        )
 
     return method
 
@@ -212,6 +234,7 @@ class _TypicalInstance(Generic[InputsProto, StateCore]):
     appears to be a provider of the C{InputsProto} protocol.  Methods are
     populated below by the logic in L{TypicalBuilder.buildClass}.
     """
+
     _stateCore: StateCore
     _transitioner: Transitioner
     _stateCluster: Dict[str, UserStateType] = field(default_factory=dict)
@@ -231,27 +254,26 @@ class _TypicalClass(
 ):
     """
     Class-ish object that supplies the implementation of the protocol described
-    by L{InputsProto}.  This class's constructor mimics the signature of
+    by L{InputsProto}.  This class's constructor mimics the signature of its
+    state-builder function, and it will type-check accordingly.
     """
 
     _buildCore: Callable[P, StateCore]
-    _initalState: Type[UserStateType]
+    _initialState: Type[UserStateType]
     _automaton: Automaton
     _realSyntheticType: Type[_TypicalInstance]
-    _stateFactories: Dict[str, Callable[[StateCore], UserStateType]]
-    _stateProtocol: ProtocolAtRuntime[InputsProto]
+    _stateFactories: Dict[str, Callable[..., UserStateType]]
 
     def __call__(self, *initArgs: P.args, **initKwargs: P.kwargs) -> InputsProto:
         """
-        Create an inputs proto
+        Instantiate the class asociated with this L{_TypicalClass}, producing
+        something that appears to be an L{InputsProto}.
         """
         result = self._realSyntheticType(
             self._buildCore(*initArgs, **initKwargs),
-            Transitioner(self._automaton, self._initalState.__name__),
+            Transitioner(self._automaton, self._initialState.__name__),
         )
-        _updateState(
-            None, result, None, (), {}, self._stateFactories, self._stateProtocol
-        )
+        _updateState(None, result, (), {}, self._stateFactories, None)
         return result  # type: ignore
 
     def __instancecheck__(self, other: object) -> bool:
@@ -262,6 +284,15 @@ class _TypicalClass(
         return isinstance(other, self._realSyntheticType)
 
 
+class _TypicalErrorState:
+    """
+    This is the default error state.  It has no methods, and so you cannot
+    recover by default.
+    """
+
+    __persistState__ = False
+
+
 @dataclass
 class TypicalBuilder(Generic[InputsProto, StateCore, P]):
     """
@@ -270,34 +301,75 @@ class TypicalBuilder(Generic[InputsProto, StateCore, P]):
 
     _stateProtocol: ProtocolAtRuntime[InputsProto]
     _buildCore: Callable[P, StateCore]
+    _privateProtocols: set[ProtocolAtRuntime[object]] = field(default_factory=set)
+
+    # internal state
     _stateClasses: List[Type[object]] = field(default_factory=list)
+    _built: bool = False
+    _errorState: Type[object] = _TypicalErrorState
+    _defaultMethods: Dict[str, Tuple[Callable[..., Any], bool]] = field(
+        default_factory=dict
+    )
 
     def buildClass(self) -> _TypicalClass[InputsProto, StateCore, P]:
         """
         Transfer state class declarations into underlying state machine.
         """
+        if self._built:
+            raise RuntimeError("You can only build once, after that use the class")
+        self._built = True
         automaton = Automaton()
-        stateFactories: Dict[str, Callable[[StateCore], UserStateType]] = {}
-        for stateClass in self._stateClasses:
-            for x in dir(stateClass):
-                output = getattr(stateClass, x)
-                ah = getattr(output, "__automat_handler__", None)
-                if ah is None:
-                    continue
-                method: Callable[..., object]
-                enter: Optional[Callable[[], Type[object]]]
-                [method, enter] = ah
-                newStateType = stateClass if enter is None else enter()
-                name = method.__name__
-                stateFactories[newStateType.__name__] = newStateType
-                # todo: method & output ought to have matching signatures (modulo
-                # 'self' of a different type)
-                automaton.addTransition(
-                    stateClass.__name__,
-                    method.__name__,
-                    newStateType.__name__,
-                    [output.__name__],
+        automaton.unhandledTransition(self._errorState.__name__, [None])
+        stateFactories: Dict[str, Callable[..., UserStateType]] = {}
+
+        ns: Dict[str, object] = {
+            "_stateFactories": stateFactories,
+        }
+        for eachStateProtocol in [self._stateProtocol, *self._privateProtocols]:
+            possibleInputs = set(dir(eachStateProtocol)) - set(
+                ["__dict__", "__weakref__", *dir(Protocol)]
+            )
+            for stateClass in [*self._stateClasses, self._errorState]:
+                stateFactories[stateClass.__name__] = stateClass
+                for outputMethodName in dir(stateClass):
+                    outputMethod = getattr(stateClass, outputMethodName)
+                    ah = getattr(outputMethod, "__automat_handler__", None)
+                    if ah is None:
+                        continue
+                    inputMethod: Callable[..., object]
+                    enter: Optional[Callable[[], Type[object]]]
+                    [inputMethod, enter] = ah
+                    newStateType = stateClass if enter is None else enter()
+                    inputName = inputMethod.__name__
+                    if inputName not in possibleInputs:
+                        # TODO: arrogate these to the correct place.
+                        continue
+                    automaton.addTransition(
+                        stateClass.__name__,
+                        inputName,
+                        newStateType.__name__,
+                        [outputMethodName],
+                    )
+            for eachInput in possibleInputs:
+                ns[eachInput] = _bindableTransitionMethod(
+                    getattr(eachStateProtocol, eachInput),
+                    stateFactories,
+                    eachStateProtocol,
                 )
+
+        # default methods are really only supposed to work for the main /
+        # public interface, since the only reason to have them is public-facing.
+        defaultMethods = {
+            defaultMethodName: _bindableDefaultMethod(
+                getattr(self._stateProtocol, defaultMethodName),
+                defaultImpl,
+                includePrivate,
+            )
+            for defaultMethodName, (
+                defaultImpl,
+                includePrivate,
+            ) in self._defaultMethods.items()
+        }
         return _TypicalClass(
             self._buildCore,
             self._stateClasses[0],
@@ -306,26 +378,14 @@ class TypicalBuilder(Generic[InputsProto, StateCore, P]):
                 f"Machine<{self._stateProtocol.__name__}>",
                 tuple([_TypicalInstance]),
                 {
-                    "_stateProtocol": self._stateProtocol,
-                    "_stateFactories": stateFactories,
-                    **{
-                        inputMethodName: _bindableTransitionMethod(
-                            getattr(self._stateProtocol, inputMethodName),
-                            stateFactories,
-                            self._stateProtocol,
-                        )
-                        for inputMethodName in (
-                            set(dir(self._stateProtocol))
-                            - set(["__dict__", "__weakref__", *dir(Protocol)])
-                        )
-                    },
+                    **ns,
+                    **defaultMethods,
                 },
             ),
             stateFactories,
-            self._stateProtocol,
         )
 
-    def state(self, *, persist=True) -> Callable[[Type[T]], Type[T]]:
+    def state(self, *, persist=True, error=False) -> Callable[[Type[T]], Type[T]]:
         """
         Decorate a state class to note that it's a state.
 
@@ -335,17 +395,13 @@ class TypicalBuilder(Generic[InputsProto, StateCore, P]):
 
         def _saveStateClass(stateClass: Type[T]) -> Type[T]:
             stateClass.__persistState__ = persist  # type: ignore
-            self._stateClasses.append(stateClass)
+            if error:
+                self._errorState = stateClass
+            else:
+                self._stateClasses.append(stateClass)
             return stateClass
 
         return _saveStateClass
-
-    def initial(self, stateClass: Type[T]) -> Type[T]:
-        """
-        Decorate a state class to note that it's the initial state.
-        """
-        self._stateClasses.insert(0, stateClass)
-        return stateClass
 
     def handle(
         self,
@@ -365,6 +421,63 @@ class TypicalBuilder(Generic[InputsProto, StateCore, P]):
 
         return decorator
 
+    @overload
+    def implement(
+        self,
+        input: Callable[Concatenate[SelfA, ThisInputArgs], R],
+    ) -> Callable[
+        [Callable[Concatenate[InputsProto, StateCore, ThisInputArgs], R]],
+        Callable[Concatenate[InputsProto, StateCore, ThisInputArgs], R],
+    ]:
+        def decorator(f: OutputCallable) -> OutputCallable:
+            self._defaultMethods[input.__name__] = (f, False)
+            return f
+
+        return decorator
+
+    @overload
+    def implement(
+        self,
+        input: Callable[Concatenate[SelfA, ThisInputArgs], R],
+        privateType: ProtocolAtRuntime[PrivateProto],
+    ) -> Callable[
+        [Callable[Concatenate[InputsProto, StateCore, PrivateProto, ThisInputArgs], R]],
+        Callable[Concatenate[InputsProto, StateCore, PrivateProto, ThisInputArgs], R],
+    ]:
+        ...
+
+    def implement(
+        self,
+        input: Callable[Concatenate[SelfA, ThisInputArgs], R],
+        privateType: ProtocolAtRuntime[PrivateProto] | None = None,
+    ) -> (
+        Callable[
+            [
+                Callable[
+                    Concatenate[InputsProto, StateCore, PrivateProto, ThisInputArgs], R
+                ]
+            ],
+            Callable[
+                Concatenate[InputsProto, StateCore, PrivateProto, ThisInputArgs], R
+            ],
+        ]
+        | Callable[
+            [Callable[Concatenate[InputsProto, StateCore, ThisInputArgs], R]],
+            Callable[Concatenate[InputsProto, StateCore, ThisInputArgs], R],
+        ]
+    ):
+        """
+        Implement one of the methods on the public inputs protocol.
+        """
+        if privateType is not None:
+            self._privateProtocols.add(privateType)
+
+        def decorator(f: OutputCallable) -> OutputCallable:
+            self._defaultMethods[input.__name__] = (f, privateType is not None)
+            return f
+
+        return decorator
+
 
 if __name__ == "__main__":
 
@@ -378,15 +491,11 @@ if __name__ == "__main__":
     @dataclass
     class BrewerStateCore(object):
         heat: int = 0
-        beans: Optional[object] = None
 
     coffee = TypicalBuilder(CoffeeMachine, BrewerStateCore)
 
     @coffee.state()
-    @dataclass
     class NoBeanHaver(object):
-        core: BrewerStateCore
-
         @coffee.handle(CoffeeMachine.brew_button)
         def no_beans(self) -> None:
             print("no beans, not heating")
@@ -394,7 +503,6 @@ if __name__ == "__main__":
         @coffee.handle(CoffeeMachine.put_in_beans, enter=lambda: BeanHaver)
         def add_beans(self, beans) -> None:
             print("put in some beans", repr(beans))
-            self.core.beans = beans
 
     @coffee.state(persist=False)
     @dataclass
@@ -429,3 +537,169 @@ if __name__ == "__main__":
     x.brew_button()
     x.put_in_beans("new beans")
     x.brew_button()
+
+    @dataclass
+    class ControlPlane(object):
+        _cb: Callable[[Callable[[Turnstile], None]], None]
+        _pending_operation: str | None = None
+        _money_counter: int = 0
+
+        def __post_init__(self) -> None:
+            # Hmm. Don't love this pattern for handing portions of the state
+            # core back to the caller...
+            @self._cb
+            def complete_operation(t: Turnstile) -> None:
+                o, self._pending_operation = self._pending_operation, None
+                match o:
+                    case "lock":
+                        t.arm_lock_engaged()
+                    case "unlock":
+                        t.arm_lock_disengaged()
+                        t.arm_rotated()
+                    case None:
+                        t.token_inserted()
+
+        def lock(self) -> None:
+            assert self._pending_operation is None
+            self._pending_operation = "lock"
+
+        def unlock(self) -> None:
+            assert self._pending_operation is None
+            self._pending_operation = "unlock"
+
+        def reset(self) -> None:
+            self._pending_operation = None
+
+    class Turnstile(Protocol):
+        def kick(self) -> None:
+            ...
+
+        def token_inserted(self) -> None:
+            ...
+
+        def arm_rotated(self) -> None:
+            ...
+
+        def arm_lock_engaged(self) -> None:
+            ...
+
+        def arm_lock_disengaged(self) -> None:
+            ...
+
+        def repair(self) -> None:
+            ...
+
+    turn = TypicalBuilder(Turnstile, ControlPlane)
+
+    # You can use .implement to have wrapper implementations that apply in all
+    # states.  Note that these methods will execute even in error states, so if
+    # you need to bail out in error conditions make sure to call something on
+    # your public-protocol first argument.
+
+    @turn.implement(Turnstile.kick)
+    def kick(t: Turnstile, p: ControlPlane) -> None:
+        print("BANG")
+
+    # You can also define *internal* protocols that your state classes can use.
+    # Mypy will not make these methods visible to your callers, although they
+    # are present at runtime.
+    class InternalTurnstile(Protocol):
+        def _add_token(self) -> int:
+            pass
+
+        def _enough_tokens(self) -> None:
+            ...
+
+    # If you ask for an internal interface, it will be passed along with the
+    # public interface and state core.  Internal interfaces like this can be
+    # used for "private" inputs; i.e. inputs to the state machine which should
+    # only be generated when certain conditions are met, such as a counter
+    # exceeding a threshold as shown here.
+    @turn.implement(Turnstile.token_inserted, InternalTurnstile)
+    def count_money(t: Turnstile, p: ControlPlane, private: InternalTurnstile) -> None:
+        print("**plink**")
+        if private._add_token() == 3:
+            private._enough_tokens()
+
+    @turn.state(persist=False)
+    @dataclass
+    class Unpaid(object):
+        "Locked, not paid"
+        plane: ControlPlane
+        # persist=False above means this gets reset every time we exit this
+        # state.
+        money: int = 0
+
+        @turn.handle(InternalTurnstile._add_token)
+        def pay(self) -> int:
+            self.money += 1
+            return self.money
+
+        @turn.handle(InternalTurnstile._enough_tokens, enter=lambda: Unlocking)
+        def paid(self) -> None:
+            print("requesting unlock")
+            self.plane.unlock()
+
+    @turn.state()
+    class Unlocking(object):
+        "Paid, not unlocked yet."
+
+        @turn.handle(Turnstile.arm_lock_disengaged, enter=lambda: Paid)
+        def ready(self) -> None:
+            print("unlocked, waiting for customer to walk through")
+
+    @turn.state()
+    @dataclass
+    class Paid(object):
+        "Paid and unlocked."
+        plane: ControlPlane
+
+        @turn.handle(Turnstile.arm_rotated, enter=lambda: Locking)
+        def relock(self) -> None:
+            print("customer walked through, locking")
+            self.plane.lock()
+
+    @turn.state()
+    class Locking(object):
+        "Fare consumed, not yet locked."
+
+        @turn.handle(Turnstile.arm_lock_engaged, enter=lambda: Unpaid)
+        def engaged(self) -> None:
+            print("finished locking")
+
+    @turn.state(error=True)
+    @dataclass
+    class Broken(object):
+        plane: ControlPlane
+
+        @turn.handle(Turnstile.repair, enter=lambda: Unpaid)
+        def repair(self) -> None:
+            self.plane.reset()
+
+    Turner = turn.buildClass()
+    loops: List[Callable[[Turnstile], None]] = []
+    t = Turner(loops.append)
+    [loop] = loops
+    print()
+    print("turnstile example:")
+    t.kick()
+    for _ in range(10):
+        loop(t)
+
+    print("haywire messages from microcontroller")
+    import traceback
+
+    try:
+        t.arm_rotated()
+    except:
+        traceback.print_exc()
+        print("handled")
+    try:
+        t.arm_rotated()
+    except:
+        traceback.print_exc()
+        print("still broken, fixing")
+        t.repair()
+    # fixed now
+    for _ in range(10):
+        loop(t)
