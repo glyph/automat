@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import sys
 from dataclasses import dataclass, field
+from functools import wraps
 from inspect import Signature, signature
 from typing import (
     Any,
     Callable,
+    ClassVar,
     Dict,
     Generic,
     List,
@@ -13,16 +15,18 @@ from typing import (
     Optional,
     Protocol,
     Sequence,
+    TYPE_CHECKING,
     Tuple,
     Type,
     TypeVar,
-    TYPE_CHECKING,
 )
 
 from ._core import Automaton, Transitioner
 
+
 if sys.version_info >= (3, 10):
     from typing import Concatenate, ParamSpec
+
     P = ParamSpec("P")
     ThisInputArgs = ParamSpec("ThisInputArgs")
 else:
@@ -42,6 +46,8 @@ OutputCallable = TypeVar("OutputCallable")
 
 
 class ProtocolAtRuntime(Protocol[InputsProto]):
+    __name__: str
+
     def __call__(self) -> InputsProto:
         ...
 
@@ -126,7 +132,7 @@ def _buildNewState(
     expectedParams = factorySignature.parameters
 
     for extra_param in (
-        expectedParams[each] for each in list(expectedParams.keys())[1:]
+        expectedParams[each] for each in list(expectedParams.keys())[1:]  # skip `self`
     ):
         param_name = extra_param.name
         k[param_name] = _magicValueForParameter(
@@ -143,19 +149,20 @@ def _buildNewState(
 
 def _updateState(
     oldState: str | None,
-    self: ClassClusterInstance[InputsProto, StateCore],
+    self: _TypicalInstance[InputsProto, StateCore],
     inputMethodName: Optional[str],
     a: Tuple[object, ...],
     kw: Dict[str, object],
+    stateFactories: Dict[str, Callable[[StateCore], UserStateType]],
+    stateProtocol: ProtocolAtRuntime[InputsProto],
 ) -> Tuple[Any, object]:
-    """ """
     currentState = self._transitioner._state
-    stateFactory = self._builder._stateFactories[currentState]
+    stateFactory = stateFactories[currentState]
     if currentState in self._stateCluster:
         stateObject = self._stateCluster[currentState]
     else:
         stateObject = self._stateCluster[currentState] = _buildNewState(
-            getattr(self._builder._stateProtocol, inputMethodName)
+            getattr(stateProtocol, inputMethodName)
             if inputMethodName is not None
             else None,
             stateFactory,
@@ -165,7 +172,7 @@ def _updateState(
             self._stateCluster,
         )
     if oldState is not None:
-        oldStateFactory = self._builder._stateFactories[oldState]
+        oldStateFactory = stateFactories[oldState]
         if oldState != currentState:
             shouldOldPersist: bool = oldStateFactory.__persistState__  # type: ignore
             if not shouldOldPersist:
@@ -173,67 +180,90 @@ def _updateState(
     return stateFactory, stateObject
 
 
-@dataclass
-class ClassClusterInstance(Generic[InputsProto, StateCore]):
-    """ """
+_baseMethods = set(dir(Protocol))
 
-    _builder: ClassClusterBuilder[InputsProto, StateCore, object]
+
+def _bindableTransitionMethod(
+    inputMethod: Callable,
+    stateFactories: Dict[str, Callable[[StateCore], UserStateType]],
+    stateProtocol: ProtocolAtRuntime[InputsProto],
+) -> Callable[..., object]:
+    inputMethodName = inputMethod.__name__
+
+    @wraps(inputMethod)
+    def method(self: _TypicalInstance[InputsProto, StateCore], *a, **kw) -> object:
+        oldState = self._transitioner._state
+        stateObject = self._stateCluster[oldState]
+        [[outputMethodName], tracer] = self._transitioner.transition(inputMethodName)
+        realMethod = getattr(stateObject, outputMethodName)
+        result = realMethod(*a, **kw)
+        _updateState(
+            oldState, self, inputMethodName, a, kw, stateFactories, stateProtocol
+        )
+        return result
+
+    return method
+
+
+@dataclass
+class _TypicalInstance(Generic[InputsProto, StateCore]):
+    """
+    Trivial superclass of state-cluster instances.  To application code,
+    appears to be a provider of the C{InputsProto} protocol.  Methods are
+    populated below by the logic in L{TypicalBuilder.buildClass}.
+    """
     _stateCore: StateCore
     _transitioner: Transitioner
     _stateCluster: Dict[str, UserStateType] = field(default_factory=dict)
 
-    def __post_init__(self) -> None:
-        """
-        Pre-allocate the initial state object so we'll fail somewhere
-        comprehensible in L{ClassClusterBuilder.build}.
-        """
-        _updateState(None, self, None, (), {})
 
-    def __getattr__(self, inputMethodName: str) -> Callable[..., object]:
-        # TODO: this could all be done ahead of time by building an actual type
-        # object with methods populated, no need to dynamically (slowly) build
-        # function objects on each method call
-        def method(*a, **kw) -> object:
-            # We enforce only-a-single-output.
-            oldState = self._transitioner._state
-            stateObject = self._stateCluster[oldState]
-            [[outputMethodName], tracer] = self._transitioner.transition(
-                inputMethodName
-            )
-            realMethod = getattr(stateObject, outputMethodName)
-            result = realMethod(*a, **kw)
-            _updateState(oldState, self, inputMethodName, a, kw)
-            return result
-
-        method.__name__ = inputMethodName
-        return method
+if TYPE_CHECKING:
+    _typeish = type
+else:
+    _typeish = object
 
 
 @dataclass
-class ClassClusterBuilder(Generic[InputsProto, StateCore, P]):
+class _TypicalClass(
+    Generic[InputsProto, StateCore, P],
+    _typeish,  # Lie about being a type to work around
+    # https://github.com/python/mypy/issues/12974
+):
+    """
+    Class-ish object that supplies the implementation of the protocol described
+    by L{InputsProto}.  This class's constructor mimics the signature of
+    """
 
-    _stateProtocol: ProtocolAtRuntime[InputsProto]
     _buildCore: Callable[P, StateCore]
     _initalState: Type[UserStateType]
-    _stateFactories: Dict[str, Callable[[StateCore], UserStateType]] = field(
-        default_factory=dict
-    )
-    _automaton: Automaton = field(default_factory=Automaton)
+    _automaton: Automaton
+    _realSyntheticType: Type[_TypicalInstance]
+    _stateFactories: Dict[str, Callable[[StateCore], UserStateType]]
+    _stateProtocol: ProtocolAtRuntime[InputsProto]
 
-    def build(self, *initArgs: P.args, **initKwargs: P.kwargs) -> InputsProto:
+    def __call__(self, *initArgs: P.args, **initKwargs: P.kwargs) -> InputsProto:
         """
         Create an inputs proto
         """
-        result = ClassClusterInstance(
-            self,
+        result = self._realSyntheticType(
             self._buildCore(*initArgs, **initKwargs),
             Transitioner(self._automaton, self._initalState.__name__),
         )
+        _updateState(
+            None, result, None, (), {}, self._stateFactories, self._stateProtocol
+        )
         return result  # type: ignore
+
+    def __instancecheck__(self, other: object) -> bool:
+        """
+        A L{_TypicalInstance} is an instance of this L{_TypicalClass} it
+        points to this object.
+        """
+        return isinstance(other, self._realSyntheticType)
 
 
 @dataclass
-class ClusterStateDecorator(Generic[InputsProto, StateCore, P]):
+class TypicalBuilder(Generic[InputsProto, StateCore, P]):
     """
     Decorator-based interface.
     """
@@ -241,12 +271,13 @@ class ClusterStateDecorator(Generic[InputsProto, StateCore, P]):
     _stateProtocol: ProtocolAtRuntime[InputsProto]
     _buildCore: Callable[P, StateCore]
     _stateClasses: List[Type[object]] = field(default_factory=list)
-    _builder: Optional[ClassClusterBuilder[InputsProto, StateCore, P]] = None
 
-    def _finish(self, builder: ClassClusterBuilder[InputsProto, StateCore, P]) -> None:
+    def buildClass(self) -> _TypicalClass[InputsProto, StateCore, P]:
         """
         Transfer state class declarations into underlying state machine.
         """
+        automaton = Automaton()
+        stateFactories: Dict[str, Callable[[StateCore], UserStateType]] = {}
         for stateClass in self._stateClasses:
             for x in dir(stateClass):
                 output = getattr(stateClass, x)
@@ -258,28 +289,41 @@ class ClusterStateDecorator(Generic[InputsProto, StateCore, P]):
                 [method, enter] = ah
                 newStateType = stateClass if enter is None else enter()
                 name = method.__name__
-                builder._stateFactories[newStateType.__name__] = newStateType
+                stateFactories[newStateType.__name__] = newStateType
                 # todo: method & output ought to have matching signatures (modulo
                 # 'self' of a different type)
-                builder._automaton.addTransition(
+                automaton.addTransition(
                     stateClass.__name__,
                     method.__name__,
                     newStateType.__name__,
                     [output.__name__],
                 )
-
-    def build(self, *initArgs: P.args, **initKwargs: P.kwargs) -> InputsProto:
-        """
-        Initialize the state transitions if necessary, then build.
-        """
-        if self._builder is None:
-            self._builder = builder = ClassClusterBuilder(
-                self._stateProtocol, self._buildCore, self._stateClasses[0]
-            )
-            self._finish(builder)
-        else:
-            builder = self._builder
-        return self._builder.build(*initArgs, **initKwargs)
+        return _TypicalClass(
+            self._buildCore,
+            self._stateClasses[0],
+            automaton,
+            type(
+                f"Machine<{self._stateProtocol.__name__}>",
+                tuple([_TypicalInstance]),
+                {
+                    "_stateProtocol": self._stateProtocol,
+                    "_stateFactories": stateFactories,
+                    **{
+                        inputMethodName: _bindableTransitionMethod(
+                            getattr(self._stateProtocol, inputMethodName),
+                            stateFactories,
+                            self._stateProtocol,
+                        )
+                        for inputMethodName in (
+                            set(dir(self._stateProtocol))
+                            - set(["__dict__", "__weakref__", *dir(Protocol)])
+                        )
+                    },
+                },
+            ),
+            stateFactories,
+            self._stateProtocol,
+        )
 
     def state(self, *, persist=True) -> Callable[[Type[T]], Type[T]]:
         """
@@ -308,7 +352,8 @@ class ClusterStateDecorator(Generic[InputsProto, StateCore, P]):
         input: Callable[Concatenate[SelfA, ThisInputArgs], R],
         enter: Optional[Callable[[], Type[object]]] = None,
     ) -> Callable[
-        [Callable[Concatenate[SelfB, ThisInputArgs], R]], Callable[Concatenate[SelfB, ThisInputArgs], R]
+        [Callable[Concatenate[SelfB, ThisInputArgs], R]],
+        Callable[Concatenate[SelfB, ThisInputArgs], R],
     ]:
         """
         Define an input handler.
@@ -332,39 +377,37 @@ if __name__ == "__main__":
 
     @dataclass
     class BrewerStateCore(object):
-        heat: int
+        heat: int = 0
         beans: Optional[object] = None
 
-    CoffeeStateMachine = ClusterStateDecorator(
-        CoffeeMachine, lambda: BrewerStateCore(0)
-    )
+    coffee = TypicalBuilder(CoffeeMachine, BrewerStateCore)
 
-    @CoffeeStateMachine.state()
+    @coffee.state()
     @dataclass
     class NoBeanHaver(object):
         core: BrewerStateCore
 
-        @CoffeeStateMachine.handle(CoffeeMachine.brew_button)
+        @coffee.handle(CoffeeMachine.brew_button)
         def no_beans(self) -> None:
             print("no beans, not heating")
 
-        @CoffeeStateMachine.handle(CoffeeMachine.put_in_beans, enter=lambda: BeanHaver)
+        @coffee.handle(CoffeeMachine.put_in_beans, enter=lambda: BeanHaver)
         def add_beans(self, beans) -> None:
             print("put in some beans", repr(beans))
             self.core.beans = beans
 
-    @CoffeeStateMachine.state(persist=False)
+    @coffee.state(persist=False)
     @dataclass
     class BeanHaver:
         core: BrewerStateCore
         beans: str
 
-        @CoffeeStateMachine.handle(CoffeeMachine.brew_button, enter=lambda: NoBeanHaver)
+        @coffee.handle(CoffeeMachine.brew_button, enter=lambda: NoBeanHaver)
         def heat_the_heating_element(self) -> None:
             self.core.heat += 1
             print("yay brewing:", repr(self.beans))
 
-        @CoffeeStateMachine.handle(CoffeeMachine.put_in_beans, enter=lambda: BeanHaver)
+        @coffee.handle(CoffeeMachine.put_in_beans, enter=lambda: BeanHaver)
         def too_many_beans(self, beans: object) -> None:
             print("beans overflowing:", repr(beans), self.beans)
 
@@ -374,7 +417,10 @@ if __name__ == "__main__":
     of the handshake state class, and can thereby access its state.
     """
 
-    x: CoffeeMachine = CoffeeStateMachine.build()
+    CoffeeStateMachine = coffee.buildClass()
+    print("Created:", CoffeeStateMachine)
+    x: CoffeeMachine = CoffeeStateMachine(3)
+    print(isinstance(x, CoffeeStateMachine))
     x.brew_button()
     x.brew_button()
     x.put_in_beans("old beans")
