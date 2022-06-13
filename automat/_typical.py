@@ -72,6 +72,8 @@ def _magicValueForParameter(
     passedParams: Dict[str, object],
     stateCore: object,
     existingStateCluster: Mapping[str, object],
+    inputProtocols: set[ProtocolAtRuntime[object]],
+    syntheticSelf: _TypicalInstance[InputsProto, StateCore],
 ) -> object:
     """
     When a state requires an attribute to be constructed, automatically
@@ -107,16 +109,20 @@ def _magicValueForParameter(
         return existingStateCluster[ptype.__name__]
     if ptype is type(stateCore):
         return stateCore
+    if ptype in inputProtocols:
+        return syntheticSelf
     raise CouldNotFindAutoParam(f"Could not find parameter {pname} anywhere.")
 
 
 def _buildNewState(
+    syntheticSelf: _TypicalInstance[InputsProto, StateCore],
     transitionMethod: Any,
     stateFactory: Callable[..., Any],
     stateCore: object,
     args: Tuple[Any, ...],
     kwargs: Dict[str, object],
     existingStateCluster: Mapping[str, object],
+    inputProtocols: set[ProtocolAtRuntime[object]],
 ) -> Any:
     """
     Create a new state object based on the existing state cluster.
@@ -146,6 +152,8 @@ def _buildNewState(
             passedParams,
             stateCore,
             existingStateCluster,
+            inputProtocols,
+            syntheticSelf,
         )
 
     return stateFactory(**k)
@@ -158,6 +166,7 @@ def _updateState(
     kw: Dict[str, object],
     stateFactories: Dict[str, Callable[..., UserStateType]],
     inputMethod: Callable[..., object] | None,
+    inputProtocols: set[ProtocolAtRuntime[object]],
 ) -> Tuple[Any, object]:
     currentState = self._transitioner._state
     stateFactory = stateFactories[currentState]
@@ -165,12 +174,14 @@ def _updateState(
         stateObject = self._stateCluster[currentState]
     else:
         stateObject = self._stateCluster[currentState] = _buildNewState(
+            self,
             inputMethod,
             stateFactory,
             self._stateCore,
             a,
             kw,
             self._stateCluster,
+            inputProtocols,
         )
     if oldState is not None:
         oldStateFactory = stateFactories[oldState]
@@ -187,7 +198,7 @@ _baseMethods = set(dir(Protocol))
 def _bindableTransitionMethod(
     inputMethod: Callable[..., object],
     stateFactories: Dict[str, Callable[..., UserStateType]],
-    stateProtocol: ProtocolAtRuntime[InputsProto],
+    inputProtocols: set[ProtocolAtRuntime[object]],
 ) -> Callable[..., object]:
     inputMethodName = inputMethod.__name__
 
@@ -196,17 +207,13 @@ def _bindableTransitionMethod(
         oldState = self._transitioner._state
         stateObject = self._stateCluster[oldState]
         [[outputMethodName], tracer] = self._transitioner.transition(inputMethodName)
-        try:
-            if outputMethodName is None:
-                raise RuntimeError("unhandled state transition")
-            else:
-                realMethod = getattr(stateObject, outputMethodName)
-                if realMethod.__automat_handler__[-1]:
-                    a = (self, *a)
-                result = realMethod(*a, **kw)
-        finally:
-            _updateState(oldState, self, a, kw, stateFactories, inputMethod)
-        return result
+        _updateState(oldState, self, a, kw, stateFactories, inputMethod, inputProtocols)
+        if outputMethodName is None:
+            raise RuntimeError(f"unhandled: state:{oldState} input:{inputMethodName}")
+        realMethod = getattr(stateObject, outputMethodName)
+        if realMethod.__automat_handler__[-1]:  # TODO: unnecessary now, remove
+            a = (self, *a)
+        return realMethod(*a, **kw)
 
     return method
 
@@ -261,6 +268,7 @@ class _TypicalClass(
     _automaton: Automaton
     _realSyntheticType: Type[_TypicalInstance]
     _stateFactories: Dict[str, Callable[..., UserStateType]]
+    _inputProtocols: set[ProtocolAtRuntime[object]]
 
     def __call__(self, *initArgs: P.args, **initKwargs: P.kwargs) -> InputsProto:
         """
@@ -271,7 +279,7 @@ class _TypicalClass(
             self._buildCore(*initArgs, **initKwargs),
             Transitioner(self._automaton, self._initialState.__name__),
         )
-        _updateState(None, result, (), {}, self._stateFactories, None)
+        _updateState(None, result, (), {}, self._stateFactories, None, self._inputProtocols)
         return result  # type: ignore
 
     def __instancecheck__(self, other: object) -> bool:
@@ -352,7 +360,7 @@ class TypicalBuilder(Generic[InputsProto, StateCore, P]):
                 ns[eachInput] = _bindableTransitionMethod(
                     getattr(eachStateProtocol, eachInput),
                     stateFactories,
-                    eachStateProtocol,
+                    set([self._stateProtocol, *self._privateProtocols]),
                 )
 
         # default methods are really only supposed to work for the main /
@@ -381,6 +389,7 @@ class TypicalBuilder(Generic[InputsProto, StateCore, P]):
                 },
             ),
             stateFactories,
+            set([self._stateProtocol, *self._privateProtocols])
         )
 
     def state(self, *, persist=True, error=False) -> Callable[[Type[T]], Type[T]]:
