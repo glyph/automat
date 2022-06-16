@@ -33,3 +33,5 @@ jobs:
           if [[ -n "${TOX_ENV}" ]]; then
             tox -e "$TOX_ENV";
           fi
+      - name: Upload coverage report
+        uses: codecov/codecov-action@v3.1.0
