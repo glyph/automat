@@ -33,7 +33,7 @@ jobs:
           if [[ -n "${TOX_ENV}" ]]; then
             tox -e "$TOX_ENV";
             if [[ "${TOX_ENV}" != "mypy" ]]; then
-              tox -e coverage-combine;
+              tox -e coverage-report;
             fi;
           fi;
       - name: Upload coverage report
