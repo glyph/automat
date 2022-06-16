@@ -32,6 +32,10 @@ jobs:
           echo "Starting: ${TOX_ENV} ${PUSH_DOCS}"
           if [[ -n "${TOX_ENV}" ]]; then
             tox -e "$TOX_ENV";
-          fi
+            if [[ "${TOX_ENV}" != "mypy" ]]; then
+              tox -e coverage-combine;
+            fi;
+          fi;
       - name: Upload coverage report
+        if: ${{ matrix.TOX_ENV != 'mypy' }}
         uses: codecov/codecov-action@v3.1.0
