@@ -47,8 +47,8 @@ values initialized, because they have to be called in the order you declare
 them.
 
 You can read about state machines and their advantages for Python programmers
-in considerably more detail
-[in this excellent series of articles from ClusterHQ](https://clusterhq.com/blog/what-is-a-state-machine/).
+in more detail [in this excellent article by Jean-Paul
+Calderone](https://web.archive.org/web/20160507053658/https://clusterhq.com/2013/12/05/what-is-a-state-machine/).
 
 ### What makes Automat different? ###
 
