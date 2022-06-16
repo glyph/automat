@@ -1,7 +1,8 @@
-from __future__ import print_function
+from __future__ import print_function, annotations
 import argparse
 import sys
 
+import attr
 import graphviz
 
 from ._discover import findMachines
@@ -60,6 +61,37 @@ def tableMaker(inputLabel, outputLabels, port, _E=elementMaker):
     return _E("table", *rows)
 
 
+@attr.frozen
+class Transition:
+     inStateInitial: bool
+     outStateInitial: bool
+     inState: str
+     outState: str
+     inputName: str
+     outputs: Sequence[str]
+
+
+def transitions(automaton, inputAsString=repr,
+                outputAsString=repr,
+                stateAsString=repr):
+    for eachTransition in automaton.allTransitions():
+        inState, inputSymbol, outState, outputSymbols = eachTransition
+        inStateInitial = inState is automaton.initialState
+        outStateInitial = outState is automaton.initialState
+        inStateName = stateAsString(inState)
+        outStateName = stateAsString(outState)
+        inputName = inputAsString(inputSymbol)
+        outputs = [outputAsString(outputSymbol) for outputSymbol in outputSymbols]
+        yield Transition(
+            inStateInitial=inStateInitial,
+            outStateInitial=outStateInitial,
+            inState=inState,
+            outState=outState,
+            inputName=inputName,
+            outputs=outputs,
+        )
+
+
 def makeDigraph(automaton, inputAsString=repr,
                 outputAsString=repr,
                 stateAsString=repr):
@@ -71,36 +103,43 @@ def makeDigraph(automaton, inputAsString=repr,
                                node_attr={'fontname': 'Menlo'},
                                edge_attr={'fontname': 'Menlo'})
 
-    for state in automaton.states():
-        if state is automaton.initialState:
+    nodes = set()
+    def maybeAddState(name, isInitial):
+        if name in nodes:
+            return
+        if isInitial:
             stateShape = "bold"
             fontName = "Menlo-Bold"
         else:
             stateShape = ""
             fontName = "Menlo"
-        digraph.node(stateAsString(state),
+        digraph.node(name,
                      fontame=fontName,
                      shape="ellipse",
                      style=stateShape,
                      color="blue")
-    for n, eachTransition in enumerate(automaton.allTransitions()):
-        inState, inputSymbol, outState, outputSymbols = eachTransition
+        nodes.add(name)
+        
+    for n, transition in enumerate(transitions(automaton, inputAsString,
+                outputAsString,
+                stateAsString)):
+        maybeAddState(transition.inState, transition.inStateInitial)
+        maybeAddState(transition.outState, transition.outStateInitial)
         thisTransition = "t{}".format(n)
-        inputLabel = inputAsString(inputSymbol)
+        inputLabel = transition.inputName
 
         port = "tableport"
-        table = tableMaker(inputLabel, [outputAsString(outputSymbol)
-                                        for outputSymbol in outputSymbols],
+        table = tableMaker(inputLabel, transition.outputs,
                            port=port)
 
         digraph.node(thisTransition,
                      label=_gvhtml(table), margin="0.2", shape="none")
 
-        digraph.edge(stateAsString(inState),
+        digraph.edge(transition.inState,
                      '{}:{}:w'.format(thisTransition, port),
                      arrowhead="none")
         digraph.edge('{}:{}:e'.format(thisTransition, port),
-                     stateAsString(outState))
+                     transition.outState)
 
     return digraph
 
