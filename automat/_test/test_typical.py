@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from unittest import TestCase
 
-from .._typical import 
+from .._typical import TypicalBuilder
 
 
 class TypicalTests(object):
