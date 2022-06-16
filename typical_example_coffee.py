@@ -46,12 +46,6 @@ class BeanHaver:
         print("beans overflowing:", repr(beans), self.beans)
 
 
-"""
-Need a better example that has a start, handshake, and established state
-class, and the established state class can have a reference to an instance
-of the handshake state class, and can thereby access its state.
-"""
-
 CoffeeStateMachine = coffee.buildClass()
 print("Created:", CoffeeStateMachine)
 x: CoffeeMachine = CoffeeStateMachine(3)
