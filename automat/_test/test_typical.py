@@ -29,6 +29,7 @@ class TheState(object):
         self.core.count += 1
         return self.core.count
 
+C = builder.buildClass()
 
 class TypicalTests(TestCase):
     """
@@ -40,7 +41,7 @@ class TypicalTests(TestCase):
         Simplest test of all available classes.
         """
 
-        c = builder.buildClass()
-        i = c()
+        i = C()
+
         self.assertEqual(i.one(), 1)
         self.assertEqual(i.one(), 2)
