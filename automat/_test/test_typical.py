@@ -7,7 +7,7 @@ from unittest import TestCase
 from .._typical import TypicalBuilder
 
 
-class OneInput(Protocol):
+class SomeInputs(Protocol):
     def one(self) -> int:
         "It's the input"
 
@@ -23,25 +23,53 @@ class OneInput(Protocol):
         check on the value
         """
 
+    def in_every_state(self, fixture: TestCase) -> int:
+        """
+        Every state implements this with a default method.
+        """
+
+
 class StateCore(object):
     "It's a state core"
     count: int = 0
+    shared: int = 10
 
-builder = TypicalBuilder(OneInput, StateCore)
+
+builder = TypicalBuilder(SomeInputs, StateCore)
+
+
+@builder.implement(SomeInputs.in_every_state)
+def everystate(
+    public_interface: SomeInputs, state_core: StateCore, fixture: TestCase
+) -> int:
+    """
+    In every state, we can implement this the same way.
+    """
+    methods = set(dir(public_interface))
+    fixture.assertIn("one", methods)
+    fixture.assertIn("depcheck", methods)
+    fixture.assertIn("valcheck", methods)
+    fixture.assertIn("in_every_state", methods)
+    fixture.assertNotIn("not_an_input", methods)
+    fixture.assertIsInstance(state_core, StateCore)
+    state_core.shared += 1
+    return state_core.shared
+
 
 @builder.state()
 @dataclass
 class TheState(object):
-    # TODO: must be module-scope because type annotations get evaluated in
-    # global scope
+    # TODO: right now this must be module-scope because type annotations get
+    # evaluated in global scope, but we could capture scopes in .state() and
+    # .handle()
     core: StateCore
 
-    @builder.handle(OneInput.one)
+    @builder.handle(SomeInputs.one)
     def go(self) -> int:
         self.core.count += 1
         return self.core.count
 
-    @builder.handle(OneInput.depcheck, enter=lambda: CoreDataRequirer)
+    @builder.handle(SomeInputs.depcheck, enter=lambda: CoreDataRequirer)
     def from_core(self, count: str):
         return count
 
@@ -52,13 +80,16 @@ class CoreDataRequirer(object):
     """
     I require data supplied by the state core.
     """
+
     count: int
 
-    @builder.handle(OneInput.valcheck)
+    @builder.handle(SomeInputs.valcheck)
     def get(self) -> int:
         return self.count
 
+
 C = builder.buildClass()
+
 
 class TypicalTests(TestCase):
     """
@@ -86,3 +117,14 @@ class TypicalTests(TestCase):
         i.one()
         i.depcheck("ignore")
         self.assertEqual(i.valcheck(), 2)
+
+    def test_default_implementation(self) -> None:
+        """
+        L{TypicalBuilder.implement} implements the state behavior for every
+        state.
+        """
+        i = C()
+        self.assertEqual(i.in_every_state(self), 11)
+        # ^ note the value here starts at 10 to distinguish value from 'count'
+        i.depcheck("ignore")
+        self.assertEqual(i.in_every_state(self), 12)
