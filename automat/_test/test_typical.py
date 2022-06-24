@@ -28,6 +28,19 @@ class SomeInputs(Protocol):
         Every state implements this with a default method.
         """
 
+    def next(self) -> tuple[object, int]:
+        """
+        Advance to next state in the chain for testing something about
+        transitioning.
+        """
+
+    def back(self) -> tuple[object, int]:
+        """
+        Return to previous state in the chain for testing something about
+        transitioning.
+        """
+
+
 
 class StateCore(object):
     "It's a state core"
@@ -72,6 +85,33 @@ class TheState(object):
     @builder.handle(SomeInputs.depcheck, enter=lambda: CoreDataRequirer)
     def from_core(self, count: str):
         return count
+
+    @builder.handle(SomeInputs.next, enter=lambda: RequiresTheState1)
+    def justself(self) -> tuple[object, int]:
+        return (self, 0)
+
+@builder.state()
+@dataclass
+class RequiresTheState1(object):
+    other_state: TheState
+
+    @builder.handle(SomeInputs.next, enter=lambda: RequiresTheState2)
+    def justrequired(self) -> tuple[object, int]:
+        return (self.other_state, 1)
+
+    @builder.handle(SomeInputs.back, enter=lambda: TheState)
+    def goback(self) -> tuple[object, int]:
+        return (self.other_state, 1)
+
+
+@builder.state()
+@dataclass
+class RequiresTheState2(object):
+    other_state: TheState
+
+    @builder.handle(SomeInputs.next)
+    def justrequired(self) -> tuple[object, int]:
+        return (self.other_state, 2)
 
 
 @builder.state()
@@ -128,3 +168,24 @@ class TypicalTests(TestCase):
         # ^ note the value here starts at 10 to distinguish value from 'count'
         i.depcheck("ignore")
         self.assertEqual(i.in_every_state(self), 12)
+
+    def test_state_persistence(self) -> None:
+        """
+        The same state object required in different contexts should remain
+        identical.
+        """
+        i = C()
+        a, c0 = i.next()
+        b, c1 = i.back()
+        c, c2 = i.next()
+        d, c3 = i.next()
+        e, c4 = i.next()
+        self.assertEqual(c0, 0)
+        self.assertEqual(c1, 1)
+        self.assertEqual(c2, 0)
+        self.assertEqual(c3, 1)
+        self.assertEqual(c4, 2)
+        self.assertIs(a, b)
+        self.assertIs(a, c)
+        self.assertIs(a, d)
+        self.assertIs(a, e)
