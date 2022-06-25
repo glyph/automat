@@ -279,7 +279,9 @@ class _TypicalClass(
             self._buildCore(*initArgs, **initKwargs),
             Transitioner(self._automaton, self._initialState.__name__),
         )
-        _updateState(None, result, (), {}, self._stateFactories, None, self._inputProtocols)
+        _updateState(
+            None, result, (), {}, self._stateFactories, None, self._inputProtocols
+        )
         return result  # type: ignore
 
     def __instancecheck__(self, other: object) -> bool:
@@ -389,7 +391,7 @@ class TypicalBuilder(Generic[InputsProto, StateCore, P]):
                 },
             ),
             stateFactories,
-            set([self._stateProtocol, *self._privateProtocols])
+            set([self._stateProtocol, *self._privateProtocols]),
         )
 
     def state(self, *, persist=True, error=False) -> Callable[[Type[T]], Type[T]]:

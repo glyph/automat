@@ -40,6 +40,16 @@ class SomeInputs(Protocol):
         transitioning.
         """
 
+    def ephemeral(self) -> None:
+        """
+        go to non-persistent state
+        """
+
+    def persistent(self) -> None:
+        """
+        go to a persistent state
+        """
+
 
 
 class StateCore(object):
@@ -71,7 +81,7 @@ def everystate(
 
 @builder.state()
 @dataclass
-class TheState(object):
+class FirstState(object):
     # TODO: right now this must be module-scope because type annotations get
     # evaluated in global scope, but we could capture scopes in .state() and
     # .handle()
@@ -86,28 +96,36 @@ class TheState(object):
     def from_core(self, count: str):
         return count
 
-    @builder.handle(SomeInputs.next, enter=lambda: RequiresTheState1)
+    @builder.handle(SomeInputs.persistent, enter=lambda: CoreDataRequirer)
+    def persistent(self) -> None:
+        pass
+
+    @builder.handle(SomeInputs.next, enter=lambda: RequiresFirstState1)
     def justself(self) -> tuple[object, int]:
         return (self, 0)
 
+    @builder.handle(SomeInputs.ephemeral, enter=lambda: Ephemeral)
+    def ephemeral(self) -> None:
+        pass
+
 @builder.state()
 @dataclass
-class RequiresTheState1(object):
-    other_state: TheState
+class RequiresFirstState1(object):
+    other_state: FirstState
 
-    @builder.handle(SomeInputs.next, enter=lambda: RequiresTheState2)
+    @builder.handle(SomeInputs.next, enter=lambda: RequiresFirstState2)
     def justrequired(self) -> tuple[object, int]:
         return (self.other_state, 1)
 
-    @builder.handle(SomeInputs.back, enter=lambda: TheState)
+    @builder.handle(SomeInputs.back, enter=lambda: FirstState)
     def goback(self) -> tuple[object, int]:
         return (self.other_state, 1)
 
 
 @builder.state()
 @dataclass
-class RequiresTheState2(object):
-    other_state: TheState
+class RequiresFirstState2(object):
+    other_state: FirstState
 
     @builder.handle(SomeInputs.next)
     def justrequired(self) -> tuple[object, int]:
@@ -118,7 +136,7 @@ class RequiresTheState2(object):
 @dataclass
 class CoreDataRequirer(object):
     """
-    I require data supplied by the state core.
+    I require data supplied by the state core (persistently).
     """
 
     count: int
@@ -126,6 +144,31 @@ class CoreDataRequirer(object):
     @builder.handle(SomeInputs.valcheck)
     def get(self) -> int:
         return self.count
+
+    @builder.handle(SomeInputs.ephemeral, enter=lambda: Ephemeral)
+    def ephemeral(self) -> None:
+        pass
+
+    @builder.handle(SomeInputs.back, enter=lambda: FirstState)
+    def back(self) -> tuple[object, int]:
+        return self, 1234
+
+@builder.state(persist=False)
+@dataclass
+class Ephemeral:
+    count: int
+
+    @builder.handle(SomeInputs.valcheck)
+    def get(self):
+        return self.count
+
+    @builder.handle(SomeInputs.persistent, enter=lambda: CoreDataRequirer)
+    def persistent(self) -> None:
+        pass
+
+    @builder.handle(SomeInputs.back, enter=lambda: FirstState)
+    def back(self) -> tuple[object, int]:
+        return self, 5678
 
 
 C = builder.buildClass()
@@ -189,3 +232,23 @@ class TypicalTests(TestCase):
         self.assertIs(a, c)
         self.assertIs(a, d)
         self.assertIs(a, e)
+
+    def test_state_ephemeral(self) -> None:
+        """
+        Ensure that ephemeral states are reset on each use, and persistent
+        states aren't.
+        """
+        i = C()
+        i.ephemeral()
+        self.assertEqual(i.valcheck(), 0)
+        i.persistent()
+        self.assertEqual(i.valcheck(), 0)
+        i.back()
+        i.one()
+        i.one()
+        i.one()
+        i.ephemeral()
+        self.assertEqual(i.valcheck(), 3)
+        i.persistent()
+        self.assertEqual(i.valcheck(), 0)
+
