@@ -1,3 +1,4 @@
+# -*- test-case-name: automat._test.test_typical -*-
 from __future__ import annotations
 
 import sys
@@ -129,7 +130,7 @@ def _buildNewState(
     """
     k = {}
     transitionSignature = (
-        signature(transitionMethod, eval_str=True, globals=globals())
+        signature(transitionMethod, eval_str=True, globals=transitionMethod.__globals__)
         if transitionMethod is not None
         else None
     )

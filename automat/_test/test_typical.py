@@ -7,6 +7,15 @@ from unittest import TestCase
 from .._typical import TypicalBuilder
 
 
+@dataclass
+class SomethingSpecial(object):
+    """
+    Stub custom 'user defined' type.
+    """
+    # have a value just to make sure we've got a distinct value in the test
+    value: str
+
+
 class SomeInputs(Protocol):
     def one(self) -> int:
         "It's the input"
@@ -50,6 +59,22 @@ class SomeInputs(Protocol):
         go to a persistent state
         """
 
+    def special(self, something: SomethingSpecial) -> None:
+        """
+        do something special
+        """
+
+    def special_ephemeral(self, something: SomethingSpecial) -> None:
+        """
+        require SomethingSpecial but on an ephemeral state object so it's
+        re-set every time
+        """
+
+    def read_special(self) -> SomethingSpecial:
+        """
+        read the special value
+        """
+
 
 
 class StateCore(object):
@@ -59,6 +84,9 @@ class StateCore(object):
 
 
 builder = TypicalBuilder(SomeInputs, StateCore)
+# TODO: right now this must be module-scope because type annotations get
+# evaluated in global scope, but we could capture scopes in .state() and
+# .handle()
 
 
 @builder.implement(SomeInputs.in_every_state)
@@ -82,9 +110,6 @@ def everystate(
 @builder.state()
 @dataclass
 class FirstState(object):
-    # TODO: right now this must be module-scope because type annotations get
-    # evaluated in global scope, but we could capture scopes in .state() and
-    # .handle()
     core: StateCore
 
     @builder.handle(SomeInputs.one)
@@ -106,7 +131,40 @@ class FirstState(object):
 
     @builder.handle(SomeInputs.ephemeral, enter=lambda: Ephemeral)
     def ephemeral(self) -> None:
-        pass
+        ...
+
+    @builder.handle(SomeInputs.special, enter=lambda: RequiresSpecial)
+    def special(self, something: SomethingSpecial) -> None:
+        ...
+
+    @builder.handle(SomeInputs.special_ephemeral, enter=lambda: RequiresSpecialEphemeral)
+    def special_ephemeral(self, something: SomethingSpecial) -> None:
+        ...
+@builder.state()
+@dataclass
+class RequiresSpecial(object):
+    something: SomethingSpecial
+
+    @builder.handle(SomeInputs.read_special, enter=lambda: RequiresSpecial)
+    def read_special(self) -> SomethingSpecial:
+        return self.something
+
+    @builder.handle(SomeInputs.back, enter=lambda: FirstState)
+    def back(self) -> tuple[object, int]:
+        return self, 7890
+
+@builder.state(persist=False)
+@dataclass
+class RequiresSpecialEphemeral(object):
+    something: SomethingSpecial
+
+    @builder.handle(SomeInputs.read_special, enter=lambda: RequiresSpecial)
+    def read_special(self) -> SomethingSpecial:
+        return self.something
+
+    @builder.handle(SomeInputs.back, enter=lambda: FirstState)
+    def back(self) -> tuple[object, int]:
+        return self, 12013
 
 @builder.state()
 @dataclass
@@ -251,4 +309,24 @@ class TypicalTests(TestCase):
         self.assertEqual(i.valcheck(), 3)
         i.persistent()
         self.assertEqual(i.valcheck(), 0)
+
+
+    def test_state_constructor_from_transition_signature(self) -> None:
+        """
+        If a state class's constructor has a parameter matching a value from
+        the method that transitions to it, that parameter is passed in.
+        """
+        i = C()
+        i.special(SomethingSpecial("first"))
+        self.assertEqual(i.read_special(), SomethingSpecial("first"))
+        self.assertEqual(i.read_special(), SomethingSpecial("first"))
+        i.back()
+        i.special(SomethingSpecial("second"))
+        self.assertEqual(i.read_special(), SomethingSpecial("first"))
+        i.back()
+        i.special_ephemeral(SomethingSpecial("third"))
+        self.assertEqual(i.read_special(), SomethingSpecial("third"))
+        i.back()
+        i.special_ephemeral(SomethingSpecial("fourth"))
+        self.assertEqual(i.read_special(), SomethingSpecial("fourth"))
 
