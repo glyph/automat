@@ -270,7 +270,7 @@ class TypicalTests(TestCase):
         i.depcheck("ignore")
         self.assertEqual(i.in_every_state(self), 12)
 
-    def test_state_persistence(self) -> None:
+    def test_dependencies_persistent_lifecycle(self) -> None:
         """
         The same state object required in different contexts should remain
         identical.
@@ -291,7 +291,7 @@ class TypicalTests(TestCase):
         self.assertIs(a, d)
         self.assertIs(a, e)
 
-    def test_state_ephemeral(self) -> None:
+    def test_dependencies_ephemeral_lifecycle(self) -> None:
         """
         Ensure that ephemeral states are reset on each use, and persistent
         states aren't.
