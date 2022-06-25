@@ -12,6 +12,7 @@ class SomethingSpecial(object):
     """
     Stub custom 'user defined' type.
     """
+
     # have a value just to make sure we've got a distinct value in the test
     value: str
 
@@ -75,6 +76,15 @@ class SomeInputs(Protocol):
         read the special value
         """
 
+    def outside(result) -> None:
+        """
+        get ready to reveal inputs
+        """
+
+    def reveal_inputs(self) -> SomeInputs:
+        """
+        return this object in states that depend on it
+        """
 
 
 class StateCore(object):
@@ -137,9 +147,19 @@ class FirstState(object):
     def special(self, something: SomethingSpecial) -> None:
         ...
 
-    @builder.handle(SomeInputs.special_ephemeral, enter=lambda: RequiresSpecialEphemeral)
+    @builder.handle(
+        SomeInputs.special_ephemeral, enter=lambda: RequiresSpecialEphemeral
+    )
     def special_ephemeral(self, something: SomethingSpecial) -> None:
         ...
+
+    @builder.handle(SomeInputs.outside, enter=lambda: RequiresOutside)
+    def outside(self) -> None:
+        """
+        transition to state that can respond to reveal_inputs
+        """
+
+
 @builder.state()
 @dataclass
 class RequiresSpecial(object):
@@ -153,6 +173,19 @@ class RequiresSpecial(object):
     def back(self) -> tuple[object, int]:
         return self, 7890
 
+
+@builder.state()
+@dataclass
+class RequiresOutside(object):
+    """ """
+
+    machine_itself: SomeInputs
+
+    @builder.handle(SomeInputs.reveal_inputs)
+    def reveal_inputs(self) -> SomeInputs:
+        return self.machine_itself
+
+
 @builder.state(persist=False)
 @dataclass
 class RequiresSpecialEphemeral(object):
@@ -165,6 +198,7 @@ class RequiresSpecialEphemeral(object):
     @builder.handle(SomeInputs.back, enter=lambda: FirstState)
     def back(self) -> tuple[object, int]:
         return self, 12013
+
 
 @builder.state()
 @dataclass
@@ -210,6 +244,7 @@ class CoreDataRequirer(object):
     @builder.handle(SomeInputs.back, enter=lambda: FirstState)
     def back(self) -> tuple[object, int]:
         return self, 1234
+
 
 @builder.state(persist=False)
 @dataclass
@@ -310,7 +345,6 @@ class TypicalTests(TestCase):
         i.persistent()
         self.assertEqual(i.valcheck(), 0)
 
-
     def test_state_constructor_from_transition_signature(self) -> None:
         """
         If a state class's constructor has a parameter matching a value from
@@ -330,3 +364,13 @@ class TypicalTests(TestCase):
         i.special_ephemeral(SomethingSpecial("fourth"))
         self.assertEqual(i.read_special(), SomethingSpecial("fourth"))
 
+    def test_reveal_inputs(self) -> None:
+        """
+        If a state class's constructor has a parameter matching the type of the
+        protocol, it injects the state machine itself so that methods can
+        provide inputs to push the state machine forward conditionally, or in
+        response to external events (i.e. if a callback is required).
+        """
+        i = C()
+        i.outside()
+        self.assertIs(i.reveal_inputs(), i)
