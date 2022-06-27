@@ -431,24 +431,6 @@ class TypicalBuilder(Generic[InputsProto, StateCore, P]):
 
         return decorator
 
-    def handle2(
-        self,
-        input: Callable[Concatenate[SelfA, ThisInputArgs], R],
-        enter: Optional[Callable[[], Type[object]]] = None,
-    ) -> Callable[
-        [Callable[Concatenate[SelfB, InputsProto, ThisInputArgs], R]],
-        Callable[Concatenate[SelfB, InputsProto, ThisInputArgs], R],
-    ]:
-        """
-        Define an input handler.
-        """
-
-        def decorator(c: OutputCallable) -> OutputCallable:
-            c.__automat_handler__ = [input, enter, True]  # type: ignore
-            return c
-
-        return decorator
-
     @overload
     def implement(
         self,

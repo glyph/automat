@@ -103,8 +103,8 @@ class Unpaid(object):
     # state.
     money: int = 0
 
-    @turn.handle2(InternalTurnstile._add_token)
-    def pay(self, t: Turnstile) -> int:
+    @turn.handle(InternalTurnstile._add_token)
+    def pay(self) -> int:
         self.money += 1
         return self.money
 
