@@ -212,8 +212,6 @@ def _bindableTransitionMethod(
         if outputMethodName is None:
             raise RuntimeError(f"unhandled: state:{oldState} input:{inputMethodName}")
         realMethod = getattr(stateObject, outputMethodName)
-        if realMethod.__automat_handler__[-1]:  # TODO: unnecessary now, remove
-            a = (self, *a)
         return realMethod(*a, **kw)
 
     return method
@@ -347,7 +345,7 @@ class TypicalBuilder(Generic[InputsProto, StateCore, P]):
                         continue
                     inputMethod: Callable[..., object]
                     enter: Optional[Callable[[], Type[object]]]
-                    [inputMethod, enter, shouldPassSelf] = ah
+                    [inputMethod, enter] = ah
                     newStateType = stateClass if enter is None else enter()
                     inputName = inputMethod.__name__
                     if inputName not in possibleInputs:
@@ -426,7 +424,7 @@ class TypicalBuilder(Generic[InputsProto, StateCore, P]):
         """
 
         def decorator(c: OutputCallable) -> OutputCallable:
-            c.__automat_handler__ = [input, enter, False]  # type: ignore
+            c.__automat_handler__ = [input, enter]  # type: ignore
             return c
 
         return decorator
