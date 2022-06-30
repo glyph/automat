@@ -86,6 +86,22 @@ class SomeInputs(Protocol):
         return this object in states that depend on it
         """
 
+    def use_private(self) -> PrivateInputs:
+        """
+        Get the private interface.
+        """
+
+
+class PrivateInputs(Protocol):
+    """
+    Private Inputs!
+    """
+
+    def _private_method(self)->int:
+        """
+        These methods are kept separate
+        """
+
 
 class StateCore(object):
     "It's a state core"
@@ -158,6 +174,18 @@ class FirstState(object):
         """
         transition to state that can respond to reveal_inputs
         """
+
+    @builder.handle(PrivateInputs._private_method)
+    def _private(self) -> int:
+        """
+        Implement the private method.
+        """
+        return 3333
+
+
+@builder.implement(SomeInputs.use_private, PrivateInputs)
+def use_private(public: SomeInputs, core: StateCore, private: PrivateInputs) -> PrivateInputs:
+    return private
 
 
 @builder.state()
@@ -374,3 +402,18 @@ class TypicalTests(TestCase):
         i = C()
         i.outside()
         self.assertIs(i.reveal_inputs(), i)
+
+    def test_private_protocol(self) -> None:
+        """
+        You can use a private protocol to have private input methods for e.g.
+        callbacks that are not exposed publicly on your public interface.
+        """
+        i = C()
+        nothing = object()
+        private_proxy = i.use_private()
+        # possible TODOs: should we separate interfaces at runtime?
+        # TODO: private methods do not appear on the public object.
+        # self.assertIs(getattr(i, "_private_method", nothing), nothing)
+        # Public methods do not appear on the private object.
+        # TODO: self.assertIs(getattr(private_proxy, "use_private", nothing), nothing)
+        self.assertEqual(private_proxy._private_method(), 3333)
