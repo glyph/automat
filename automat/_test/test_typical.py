@@ -281,10 +281,6 @@ class CoreDataRequirer(object):
     def getshared(self) -> int:
         return self.shared
 
-    @builder.handle(SomeInputs.ephemeral, enter=lambda: Ephemeral)
-    def ephemeral(self) -> None:
-        pass
-
     @builder.handle(SomeInputs.back, enter=lambda: FirstState)
     def back(self) -> tuple[object, int]:
         return self, 1234
