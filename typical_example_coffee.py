@@ -1,6 +1,7 @@
+from __future__ import annotations
 from dataclasses import dataclass
-from typing import Protocol
-from automat import TypicalBuilder
+from typing import Protocol, Annotated as A
+from automat import TypicalBuilder, Enter
 
 
 class CoffeeMachine(Protocol):
@@ -25,8 +26,8 @@ class NoBeanHaver(object):
     def no_beans(self) -> None:
         print("no beans, not heating")
 
-    @coffee.handle(CoffeeMachine.put_in_beans, enter=lambda: BeanHaver)
-    def add_beans(self, beans) -> None:
+    @coffee.handle(CoffeeMachine.put_in_beans)
+    def add_beans(self, beans) -> A[None, Enter(BeanHaver)]:
         print("put in some beans", repr(beans))
 
 
@@ -36,12 +37,12 @@ class BeanHaver:
     core: BrewerStateCore
     beans: str
 
-    @coffee.handle(CoffeeMachine.brew_button, enter=lambda: NoBeanHaver)
-    def heat_the_heating_element(self) -> None:
+    @coffee.handle(CoffeeMachine.brew_button)
+    def heat_the_heating_element(self) -> A[None, Enter(NoBeanHaver)]:
         self.core.heat += 1
         print("yay brewing:", repr(self.beans))
 
-    @coffee.handle(CoffeeMachine.put_in_beans, enter=lambda: BeanHaver)
+    @coffee.handle(CoffeeMachine.put_in_beans)
     def too_many_beans(self, beans: object) -> None:
         print("beans overflowing:", repr(beans), self.beans)
 
