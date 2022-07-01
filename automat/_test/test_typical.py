@@ -295,9 +295,7 @@ class Ephemeral:
         return self, 5678
 
 
-print("building class")
 C = builder.buildClass()
-print("built it")
 
 
 class Simple(Protocol):
