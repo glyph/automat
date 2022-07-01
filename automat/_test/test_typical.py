@@ -238,10 +238,6 @@ class RequiresSpecialEphemeral(object):
     def read_special(self) -> SomethingSpecial:
         return self.something
 
-    @builder.handle(SomeInputs.back, enter=lambda: FirstState)
-    def back(self) -> tuple[object, int]:
-        return self, 12013
-
 
 @builder.state()
 @dataclass
