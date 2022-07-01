@@ -34,6 +34,11 @@ class SomeInputs(Protocol):
         check on the value
         """
 
+    def valcheck2(self) -> int:
+        """
+        check on the other value
+        """
+
     def in_every_state(self, fixture: TestCase) -> int:
         """
         Every state implements this with a default method.
@@ -263,10 +268,15 @@ class CoreDataRequirer(object):
     """
 
     count: int
+    shared: int = 7878
 
     @builder.handle(SomeInputs.valcheck)
     def get(self) -> int:
         return self.count
+
+    @builder.handle(SomeInputs.valcheck2)
+    def getshared(self) -> int:
+        return self.shared
 
     @builder.handle(SomeInputs.ephemeral, enter=lambda: Ephemeral)
     def ephemeral(self) -> None:
@@ -383,7 +393,9 @@ class TypicalTests(TestCase):
         i.one()
         i.one()
         i.depcheck("ignore")
+        default = i.valcheck2()
         self.assertEqual(i.valcheck(), 2)
+        self.assertEqual(default, 7878)
 
     def test_default_implementation(self) -> None:
         """
