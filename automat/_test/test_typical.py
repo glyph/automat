@@ -164,10 +164,6 @@ class FirstState(object):
         def from_core(self, count: str) -> str:
             return count
 
-    @builder.handle(SomeInputs.persistent, enter=lambda: CoreDataRequirer)
-    def persistent(self) -> None:
-        pass
-
     @builder.handle(SomeInputs.next, enter=lambda: RequiresFirstState1)
     def justself(self) -> tuple[object, int]:
         return (self, 0)
