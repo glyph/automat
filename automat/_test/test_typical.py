@@ -539,3 +539,32 @@ class TypicalTests(TestCase):
         self.assertIsInstance(i, C1)
         self.assertNotIsInstance(object(), C1)
         self.assertNotIsInstance(i, C)
+
+    def test_buildTwice(self) -> None:
+        """
+        You can't .buildClass twice.
+        """
+        with self.assertRaises(RuntimeError) as re:
+            builder.buildClass()
+        self.assertIn("only build once", str(re.exception))
+
+
+    def test_unsatisfiedDependency(self) -> None:
+        """
+        Unsatisfied dependencies will raise an exception in buildClass.
+        """
+        class Empty(Protocol):
+            pass
+
+        class Core:
+            pass
+
+        tmpbuild = TypicalBuilder(Empty, Core)
+        @tmpbuild.state()
+        @dataclass
+        class StateWithReq:
+            foo: float
+        X = tmpbuild.buildClass()
+        with self.assertRaises(RuntimeError) as re:
+            X()
+        self.assertIn("parameter foo", str(re.exception))
