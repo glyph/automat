@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Annotated, Protocol
+from typing import Protocol
+import sys
+
+if sys.version_info >= (3, 9):
+    from typing import Annotated
+
 from unittest import TestCase
 
 from .._typical import TypicalBuilder
@@ -149,9 +154,15 @@ class FirstState(object):
         self.core.count += 1
         return self.core.count
 
-    @builder.handle(SomeInputs.depcheck)
-    def from_core(self, count: str) -> Annotated[str, Enter(CoreDataRequirer)]:
-        return count
+    if sys.version_info >= (3, 9):
+        # Use Annotated when we can
+        @builder.handle(SomeInputs.depcheck)
+        def from_core(self, count: str) -> Annotated[str, Enter(CoreDataRequirer)]:
+            return count
+    else:
+        @builder.handle(SomeInputs.depcheck, enter=lambda: CoreDataRequirer)
+        def from_core(self, count: str) -> str:
+            return count
 
     @builder.handle(SomeInputs.persistent, enter=lambda: CoreDataRequirer)
     def persistent(self) -> None:
