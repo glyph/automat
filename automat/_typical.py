@@ -7,6 +7,7 @@ from enum import Enum
 from functools import wraps
 from inspect import Parameter, Signature, signature
 from typing import (
+    Annotated,
     Any,
     Callable,
     ClassVar,
@@ -22,6 +23,7 @@ from typing import (
     Tuple,
     Type,
     TypeVar,
+    get_type_hints,
     overload,
 )
 
@@ -48,6 +50,15 @@ SelfB = TypeVar("SelfB")
 R = TypeVar("R")
 T = TypeVar("T")
 OutputCallable = TypeVar("OutputCallable", bound=Callable[..., Any])
+
+
+@dataclass
+class Enter:
+    """
+    Type annotation instruction to enter the next state.
+    """
+
+    state: Type[object]
 
 
 class ProtocolAtRuntime(Protocol[InputsProto]):
@@ -291,7 +302,7 @@ class _TypicalClass(
         return isinstance(other, self._realSyntheticType)
 
 
-class _TypicalErrorState:
+class ErrorState:
     """
     This is the default error state.  It has no methods, and so you cannot
     recover by default.
@@ -313,7 +324,7 @@ class TypicalBuilder(Generic[InputsProto, StateCore, P]):
     # internal state
     _stateClasses: List[Type[object]] = field(default_factory=list)
     _built: bool = False
-    _errorState: Type[object] = _TypicalErrorState
+    _errorState: Type[object] = ErrorState
     _defaultMethods: Dict[str, Tuple[Callable[..., Any], bool]] = field(
         default_factory=dict
     )
@@ -344,9 +355,23 @@ class TypicalBuilder(Generic[InputsProto, StateCore, P]):
                     if ah is None:
                         continue
                     inputMethod: Callable[..., object]
-                    enter: Optional[Callable[[], Type[object]]]
-                    [inputMethod, enter] = ah
-                    newStateType = stateClass if enter is None else enter()
+                    enterParameter: Optional[Callable[[], Type[object]]]
+                    [inputMethod, enterParameter] = ah
+                    newStateType = (
+                        stateClass if enterParameter is None else enterParameter()
+                    )
+                    for enterAnnotation in (
+                        each
+                        for each in getattr(
+                            get_type_hints(outputMethod, include_extras=True).get(
+                                "return"
+                            ),
+                            "__metadata__",
+                            (),
+                        )
+                        if isinstance(each, Enter)
+                    ):
+                        newStateType = enterAnnotation.state
                     inputName = inputMethod.__name__
                     if inputName not in possibleInputs:
                         # TODO: arrogate these to the correct place.

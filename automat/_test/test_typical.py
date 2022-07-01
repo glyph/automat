@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Annotated, Protocol
 from unittest import TestCase
 
 from .._typical import TypicalBuilder
+from automat import Enter
 
 
 @dataclass
@@ -97,7 +98,7 @@ class PrivateInputs(Protocol):
     Private Inputs!
     """
 
-    def _private_method(self)->int:
+    def _private_method(self) -> int:
         """
         These methods are kept separate
         """
@@ -143,8 +144,8 @@ class FirstState(object):
         self.core.count += 1
         return self.core.count
 
-    @builder.handle(SomeInputs.depcheck, enter=lambda: CoreDataRequirer)
-    def from_core(self, count: str):
+    @builder.handle(SomeInputs.depcheck)
+    def from_core(self, count: str) -> Annotated[str, Enter(CoreDataRequirer)]:
         return count
 
     @builder.handle(SomeInputs.persistent, enter=lambda: CoreDataRequirer)
@@ -184,7 +185,9 @@ class FirstState(object):
 
 
 @builder.implement(SomeInputs.use_private, PrivateInputs)
-def use_private(public: SomeInputs, core: StateCore, private: PrivateInputs) -> PrivateInputs:
+def use_private(
+    public: SomeInputs, core: StateCore, private: PrivateInputs
+) -> PrivateInputs:
     return private
 
 
@@ -292,7 +295,69 @@ class Ephemeral:
         return self, 5678
 
 
+print("building class")
 C = builder.buildClass()
+print("built it")
+
+
+class Simple(Protocol):
+    """
+    A very simple protocol.
+    """
+
+    def method(self) -> int:
+        """
+        An input.
+        """
+
+    def unhandled(self) -> str:
+        """
+        An input that is not handled in the first state.
+        """
+
+
+class EmptyCore(object):
+    """
+    State core with no properties.
+    """
+
+
+builder1 = TypicalBuilder(Simple, EmptyCore)
+
+
+@builder1.state()
+class SimpleState(object):
+    """
+    State that cannot handle any inputs
+    """
+
+    @builder1.handle(Simple.method)
+    def method(self) -> int:
+        return 7
+
+
+@builder1.state(error=True)
+class RecoverableErrorState(object):
+    """
+    Error state where we can recover.
+    """
+
+    @builder1.handle(Simple.method, enter=lambda: SimpleState)
+    def method(self) -> int:
+        """
+        Return a tag, then transition back to the recoverable state.
+        """
+        return 8
+
+    @builder1.handle(Simple.unhandled)
+    def unhandled(self) -> str:
+        """
+        We do handle it though.
+        """
+        return "handled"
+
+
+C1 = builder1.buildClass()
 
 
 class TypicalTests(TestCase):
@@ -417,3 +482,42 @@ class TypicalTests(TestCase):
         # Public methods do not appear on the private object.
         # TODO: self.assertIs(getattr(private_proxy, "use_private", nothing), nothing)
         self.assertEqual(private_proxy._private_method(), 3333)
+
+    def test_unhandled_transition(self) -> None:
+        """
+        Unhandled transitions raise an exception and transition to an
+        unrecoverable error state.
+        """
+        i = C()
+        with self.assertRaises(RuntimeError) as re:
+            i.valcheck()
+
+        def check(it: str, state: str, input: str) -> None:
+            self.assertIn("unhandled:", it)
+            self.assertIn(f"state:{state}", it)
+            self.assertIn(f"input:{input}", it)
+
+        check(str(re.exception), "FirstState", "valcheck")
+        with self.assertRaises(RuntimeError) as re:
+            i.next()
+        check(str(re.exception), "Error", "next")
+
+    def test_unhandled_custom_error(self) -> None:
+        """
+        Unhandled transitions raise an exception and transition to an
+        unrecoverable error state.
+        """
+        i = C1()
+        self.assertEqual(i.method(), 7)
+        with self.assertRaises(RuntimeError) as re:
+            i.unhandled()
+
+        def check(it: str, state: str, input: str) -> None:
+            self.assertIn("unhandled:", it)
+            self.assertIn(f"state:{state}", it)
+            self.assertIn(f"input:{input}", it)
+
+        check(str(re.exception), "SimpleState", "unhandled")
+        self.assertEqual(i.unhandled(), "handled")
+        self.assertEqual(i.method(), 8)
+        self.assertEqual(i.method(), 7)
