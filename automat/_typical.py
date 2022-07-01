@@ -7,7 +7,6 @@ from enum import Enum
 from functools import wraps
 from inspect import Parameter, Signature, signature
 from typing import (
-    Annotated,
     Any,
     Callable,
     ClassVar,
@@ -30,14 +29,16 @@ from typing import (
 from ._core import Automaton, Transitioner
 
 
-if sys.version_info >= (3, 10):
-    from typing import Concatenate, ParamSpec
+if TYPE_CHECKING:
+    if sys.version_info >= (3, 10):
+        from typing import Concatenate, ParamSpec
 
-    P = ParamSpec("P")
-    ThisInputArgs = ParamSpec("ThisInputArgs")
+        P = ParamSpec("P")
+        ThisInputArgs = ParamSpec("ThisInputArgs")
 else:
-    if not TYPE_CHECKING:
-        P = TypeVar("P")
+    # really just for lower python versions but it's simpler to just have it be
+    # always at runtime
+    P = TypeVar("P")
 
 
 InputsProto = TypeVar("InputsProto", covariant=True)
