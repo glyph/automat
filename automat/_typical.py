@@ -127,6 +127,22 @@ def _magicValueForParameter(
     raise CouldNotFindAutoParam(f"Could not find parameter {pname} anywhere.")
 
 
+def _liveSignature(method: Callable[..., object]) -> Signature:
+    """
+    Get a signature with evaluated annotations.
+    """
+    result = signature(method)
+    for param in result.parameters.values():
+        annotation = param.annotation
+        if isinstance(annotation, str):
+            scope = getattr(method, "__globals__", None)
+            if scope is None:
+                module = sys.modules[method.__module__]
+                scope = module.__dict__
+            param._annotation = eval(annotation, scope)  # type:ignore
+    return result
+
+
 def _buildNewState(
     syntheticSelf: _TypicalInstance[InputsProto, StateCore],
     transitionMethod: Any,
@@ -142,7 +158,7 @@ def _buildNewState(
     """
     k = {}
     transitionSignature = (
-        signature(transitionMethod, eval_str=True, globals=transitionMethod.__globals__)
+        _liveSignature(transitionMethod)
         if transitionMethod is not None
         else None
     )
@@ -151,7 +167,7 @@ def _buildNewState(
         if transitionSignature is None
         else transitionSignature.bind(stateCore, *args, **kwargs).arguments
     )
-    factorySignature = signature(stateFactory, eval_str=True)
+    factorySignature = _liveSignature(stateFactory)
     expectedParams = factorySignature.parameters
 
     for extraParam in expectedParams.values():
