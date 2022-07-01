@@ -303,10 +303,6 @@ class Ephemeral:
     def persistent(self) -> None:
         pass
 
-    @builder.handle(SomeInputs.back, enter=lambda: FirstState)
-    def back(self) -> tuple[object, int]:
-        return self, 5678
-
 
 C = builder.buildClass()
 
