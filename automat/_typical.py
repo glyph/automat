@@ -480,11 +480,7 @@ class TypicalBuilder(Generic[InputsProto, StateCore, P]):
         [Callable[Concatenate[InputsProto, StateCore, ThisInputArgs], R]],
         Callable[Concatenate[InputsProto, StateCore, ThisInputArgs], R],
     ]:
-        def decorator(f: OutputCallable) -> OutputCallable:
-            self._defaultMethods[input.__name__] = (f, False)
-            return f
-
-        return decorator
+        ...
 
     @overload
     def implement(
