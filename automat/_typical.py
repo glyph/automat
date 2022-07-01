@@ -361,18 +361,19 @@ class TypicalBuilder(Generic[InputsProto, StateCore, P]):
                     newStateType = (
                         stateClass if enterParameter is None else enterParameter()
                     )
-                    for enterAnnotation in (
-                        each
-                        for each in getattr(
-                            get_type_hints(outputMethod, include_extras=True).get(
-                                "return"
-                            ),
-                            "__metadata__",
-                            (),
-                        )
-                        if isinstance(each, Enter)
-                    ):
-                        newStateType = enterAnnotation.state
+                    if sys.version_info >= (3, 9):
+                        for enterAnnotation in (
+                            each
+                            for each in getattr(
+                                get_type_hints(outputMethod, include_extras=True).get(
+                                    "return"
+                                ),
+                                "__metadata__",
+                                (),
+                            )
+                            if isinstance(each, Enter)
+                        ):
+                            newStateType = enterAnnotation.state
                     inputName = inputMethod.__name__
                     if inputName not in possibleInputs:
                         # TODO: arrogate these to the correct place.
