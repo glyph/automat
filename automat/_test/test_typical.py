@@ -519,3 +519,12 @@ class TypicalTests(TestCase):
         self.assertEqual(i.unhandled(), "handled")
         self.assertEqual(i.method(), 8)
         self.assertEqual(i.method(), 7)
+
+    def test_isinstance(self) -> None:
+        """
+        isinstance(proxy, _TypicalClass) returns True.
+        """
+        i = C1()
+        self.assertIsInstance(i, C1)
+        self.assertNotIsInstance(object(), C1)
+        self.assertNotIsInstance(i, C)
