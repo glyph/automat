@@ -49,8 +49,9 @@ def findMachinesViaWrapper(within):
         if isinstance(value, MethodicalMachine) and value not in visited:
             visited.add(value)
             yield attr.name, value
-        elif (inspect.isclass(value) and isOriginalLocation(attr) and
-              value not in visited):
+        elif (
+            inspect.isclass(value) and isOriginalLocation(attr) and value not in visited
+        ):
             visited.add(value)
             queue.extendleft(attr.iterAttributes())
         elif isinstance(attr, PythonModule) and value not in visited:
@@ -88,12 +89,13 @@ def wrapFQPN(fqpn):
     if not fqpn:
         raise InvalidFQPN("FQPN was empty")
 
-    components = collections.deque(fqpn.split('.'))
+    components = collections.deque(fqpn.split("."))
 
-    if '' in components:
+    if "" in components:
         raise InvalidFQPN(
             "name must be a string giving a '.'-separated list of Python "
-            "identifiers, not %r" % (fqpn,))
+            "identifiers, not %r" % (fqpn,)
+        )
 
     component = components.popleft()
     try:
@@ -118,10 +120,13 @@ def wrapFQPN(fqpn):
     attribute = module
     for component in components:
         try:
-            attribute = next(child for child in attribute.iterAttributes()
-                             if child.name.rsplit('.', 1)[-1] == component)
+            attribute = next(
+                child
+                for child in attribute.iterAttributes()
+                if child.name.rsplit(".", 1)[-1] == component
+            )
         except StopIteration:
-            raise NoObject('{}.{}'.format(attribute.name, component))
+            raise NoObject("{}.{}".format(attribute.name, component))
 
     return attribute
 
