@@ -16,8 +16,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.10"]
-        TOX_ENV: ["py310-extras", "py310-noextras", "mypy"]
+        python: ["3.10", "3.11"]
+        TOX_ENV: ["extras", "noextras", "mypy"]
 
     steps:
       - uses: actions/checkout@v3
@@ -28,11 +28,11 @@ jobs:
       - name: Tox Run
         run:  |
           pip install tox;
-          TOX_ENV="${{ matrix.TOX_ENV }}";
+          TOX_ENV="py$(echo ${{ matrix.python }} | sed -e s/\.//g)-${{ matrix.TOX_ENV }}";
           echo "Starting: ${TOX_ENV} ${PUSH_DOCS}"
           if [[ -n "${TOX_ENV}" ]]; then
             tox -e "$TOX_ENV";
-            if [[ "${TOX_ENV}" != "mypy" ]]; then
+            if [[ "${{ matrix.TOX_ENV }}" != "mypy" ]]; then
               tox -e coverage-report;
             fi;
           fi;
