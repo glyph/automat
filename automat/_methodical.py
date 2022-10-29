@@ -12,9 +12,18 @@ from ._core import Transitioner, Automaton
 from ._introspection import preserveName
 
 
-ArgSpec = collections.namedtuple('ArgSpec', ['args', 'varargs', 'varkw',
-                                             'defaults', 'kwonlyargs',
-                                             'kwonlydefaults', 'annotations'])
+ArgSpec = collections.namedtuple(
+    "ArgSpec",
+    [
+        "args",
+        "varargs",
+        "varkw",
+        "defaults",
+        "kwonlyargs",
+        "kwonlydefaults",
+        "annotations",
+    ],
+)
 
 
 def _getArgSpec(func):
@@ -34,8 +43,7 @@ def _getArgSpec(func):
         defaults=spec.defaults if spec.defaults else (),
         kwonlyargs=tuple(spec.kwonlyargs),
         kwonlydefaults=(
-            tuple(spec.kwonlydefaults.items())
-            if spec.kwonlydefaults else ()
+            tuple(spec.kwonlydefaults.items()) if spec.kwonlydefaults else ()
         ),
         annotations=tuple(spec.annotations.items()),
     )
@@ -54,8 +62,8 @@ def _getArgNames(spec):
     return set(
         spec.args
         + spec.kwonlyargs
-        + (('*args',) if spec.varargs else ())
-        + (('**kwargs',) if spec.varkw else ())
+        + (("*args",) if spec.varargs else ())
+        + (("**kwargs",) if spec.varkw else ())
         + spec.annotations
     )
 
@@ -70,9 +78,11 @@ def _keywords_only(f):
 
     Only works for methods right now.
     """
+
     @wraps(f)
     def g(self, **kw):
         return f(self, **kw)
+
     return g
 
 
@@ -81,6 +91,7 @@ class MethodicalState(object):
     """
     A state for a L{MethodicalMachine}.
     """
+
     machine = attr.ib(repr=False)
     method = attr.ib()
     serialized = attr.ib(repr=False)
@@ -120,7 +131,8 @@ class MethodicalState(object):
                         output=output.method.__name__,
                         inputSignature=getArgsSpec(input.method),
                         outputSignature=getArgsSpec(output.method),
-                ))
+                    )
+                )
         self.machine._oneTransition(self, input, enter, outputs, collector)
 
     def _name(self):
@@ -144,8 +156,10 @@ def _transitionerFromInstance(oself, symbol, automaton):
 def _empty():
     pass
 
+
 def _docstring():
     """docstring"""
+
 
 def assertNoCode(inst, attribute, f):
     # The function body must be empty, i.e. "pass" or "return None", which
@@ -159,8 +173,7 @@ def assertNoCode(inst, attribute, f):
     # checking that would require us to parse the bytecode, find the index
     # being returned, then making sure the table has a None at that index.
 
-    if f.__code__.co_code not in (_empty.__code__.co_code,
-                                  _docstring.__code__.co_code):
+    if f.__code__.co_code not in (_empty.__code__.co_code, _docstring.__code__.co_code):
         raise ValueError("function body must be empty")
 
 
@@ -198,8 +211,9 @@ def _filterArgs(args, kwargs, inputSpec, outputSpec):
     else:
         # Filter out names that the output method does not accept.
         all_accepted_names = outputSpec.args[1:] + outputSpec.kwonlyargs
-        return_kwargs = {n: v for n, v in full_kwargs.items()
-                         if n in all_accepted_names}
+        return_kwargs = {
+            n: v for n, v in full_kwargs.items() if n in all_accepted_names
+        }
 
     return return_args, return_kwargs
 
@@ -209,6 +223,7 @@ class MethodicalInput(object):
     """
     An input for a L{MethodicalMachine}.
     """
+
     automaton = attr.ib(repr=False)
     method = attr.ib(validator=assertNoCode)
     symbol = attr.ib(repr=False)
@@ -225,8 +240,8 @@ class MethodicalInput(object):
         by output functions produced by the given L{MethodicalInput} in
         C{oself}'s current state.
         """
-        transitioner = _transitionerFromInstance(oself, self.symbol,
-                                                 self.automaton)
+        transitioner = _transitionerFromInstance(oself, self.symbol, self.automaton)
+
         @preserveName(self.method)
         @wraps(self.method)
         def doInput(*args, **kwargs):
@@ -242,6 +257,7 @@ class MethodicalInput(object):
                 value = output(oself, *a, **k)
                 values.append(value)
             return collector(values)
+
         return doInput
 
     def _name(self):
@@ -253,6 +269,7 @@ class MethodicalOutput(object):
     """
     An output for a L{MethodicalMachine}.
     """
+
     machine = attr.ib(repr=False)
     method = attr.ib()
     argSpec = attr.ib(init=False, repr=False)
@@ -268,11 +285,9 @@ class MethodicalOutput(object):
         raise AttributeError(
             "{cls}.{method} is a state-machine output method; "
             "to produce this output, call an input method instead.".format(
-                cls=type.__name__,
-                method=self.method.__name__
+                cls=type.__name__, method=self.method.__name__
             )
         )
-
 
     def __call__(self, oself, *args, **kwargs):
         """
@@ -283,28 +298,29 @@ class MethodicalOutput(object):
     def _name(self):
         return self.method.__name__
 
+
 @attr.s(eq=False, hash=False)
 class MethodicalTracer(object):
     automaton = attr.ib(repr=False)
     symbol = attr.ib(repr=False)
 
-
     def __get__(self, oself, type=None):
-        transitioner = _transitionerFromInstance(oself, self.symbol,
-                                                 self.automaton)
+        transitioner = _transitionerFromInstance(oself, self.symbol, self.automaton)
+
         def setTrace(tracer):
             transitioner.setTrace(tracer)
+
         return setTrace
 
 
-
 counter = count()
+
+
 def gensym():
     """
     Create a unique Python identifier.
     """
     return "_symbol_" + str(next(counter))
-
 
 
 class MethodicalMachine(object):
@@ -318,7 +334,6 @@ class MethodicalMachine(object):
         self._reducers = {}
         self._symbol = gensym()
 
-
     def __get__(self, oself, type=None):
         """
         L{MethodicalMachine} is an implementation detail for setting up
@@ -326,14 +341,11 @@ class MethodicalMachine(object):
         instance.
         """
         if oself is not None:
-            raise AttributeError(
-                "MethodicalMachine is an implementation detail.")
+            raise AttributeError("MethodicalMachine is an implementation detail.")
         return self
 
-
     @_keywords_only
-    def state(self, initial=False, terminal=False,
-              serialized=None):
+    def state(self, initial=False, terminal=False, serialized=None):
         """
         Declare a state, possibly an initial state or a terminal state.
 
@@ -353,15 +365,16 @@ class MethodicalMachine(object):
             This value should be hashable;
             :py:func:`unicode` is a good type to use.
         """
+
         def decorator(stateMethod):
-            state = MethodicalState(machine=self,
-                                    method=stateMethod,
-                                    serialized=serialized)
+            state = MethodicalState(
+                machine=self, method=stateMethod, serialized=serialized
+            )
             if initial:
                 self._automaton.initialState = state
             return state
-        return decorator
 
+        return decorator
 
     @_keywords_only
     def input(self):
@@ -370,12 +383,13 @@ class MethodicalMachine(object):
 
         This is a decorator for methods.
         """
-        def decorator(inputMethod):
-            return MethodicalInput(automaton=self._automaton,
-                                   method=inputMethod,
-                                   symbol=self._symbol)
-        return decorator
 
+        def decorator(inputMethod):
+            return MethodicalInput(
+                automaton=self._automaton, method=inputMethod, symbol=self._symbol
+            )
+
+        return decorator
 
     @_keywords_only
     def output(self):
@@ -387,13 +401,13 @@ class MethodicalMachine(object):
         This method will be called when the state machine transitions to this
         state as specified in the decorated `output` method.
         """
+
         def decorator(outputMethod):
             return MethodicalOutput(machine=self, method=outputMethod)
+
         return decorator
 
-
-    def _oneTransition(self, startState, inputToken, endState, outputTokens,
-                       collector):
+    def _oneTransition(self, startState, inputToken, endState, outputTokens, collector):
         """
         See L{MethodicalState.upon}.
         """
@@ -411,30 +425,31 @@ class MethodicalMachine(object):
         #     if not isinstance(endState, MethodicalState):
         #         raise NotImplementedError("output state {} isn't a state"
         #                                   .format(endState))
-        self._automaton.addTransition(startState, inputToken, endState,
-                                      tuple(outputTokens))
+        self._automaton.addTransition(
+            startState, inputToken, endState, tuple(outputTokens)
+        )
         inputToken.collectors[startState] = collector
-
 
     @_keywords_only
     def serializer(self):
-        """
+        """ """
 
-        """
         def decorator(decoratee):
             @wraps(decoratee)
             def serialize(oself):
-                transitioner = _transitionerFromInstance(oself, self._symbol,
-                                                         self._automaton)
+                transitioner = _transitionerFromInstance(
+                    oself, self._symbol, self._automaton
+                )
                 return decoratee(oself, transitioner._state.serialized)
+
             return serialize
+
         return decorator
 
     @_keywords_only
     def unserializer(self):
-        """
+        """ """
 
-        """
         def decorator(decoratee):
             @wraps(decoratee)
             def unserialize(oself, *args, **kwargs):
@@ -443,10 +458,13 @@ class MethodicalMachine(object):
                 for eachState in self._automaton.states():
                     mapping[eachState.serialized] = eachState
                 transitioner = _transitionerFromInstance(
-                    oself, self._symbol, self._automaton)
+                    oself, self._symbol, self._automaton
+                )
                 transitioner._state = mapping[state]
-                return None # it's on purpose
+                return None  # it's on purpose
+
             return unserialize
+
         return decorator
 
     @property
@@ -464,6 +482,7 @@ class MethodicalMachine(object):
 
         """
         from ._visualize import makeDigraph
+
         return makeDigraph(
             self._automaton,
             stateAsString=lambda state: state.method.__name__,
