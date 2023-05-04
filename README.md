@@ -1,8 +1,8 @@
 # Automat #
 
 [![Documentation Status](https://readthedocs.org/projects/automat/badge/?version=latest)](http://automat.readthedocs.io/en/latest/)
-[![Build Status](https://travis-ci.org/glyph/automat.svg?branch=master)](https://travis-ci.org/glyph/automat)
-[![Coverage Status](https://coveralls.io/repos/glyph/automat/badge.png)](https://coveralls.io/r/glyph/automat)
+[![Build Status](https://github.com/glyph/automat/actions/workflows/ci.yml/badge.svg?branch=trunk)](https://github.com/glyph/automat/actions/workflows/ci.yml?query=branch%3Atrunk)
+[![Coverage Status](http://codecov.io/github/glyph/automat/coverage.svg?branch=trunk)](http://codecov.io/github/glyph/automat?branch=trunk)
 
 ## Self-service finite-state machines for the programmer on the go. ##
 
