@@ -72,7 +72,7 @@ class Automaton(object):
         # keeping self._transitions in a flat list makes addTransition
         # O(n^2), but state machines don't tend to have hundreds of
         # transitions.
-        for (anInState, anInputSymbol, anOutState, _) in self._transitions:
+        for anInState, anInputSymbol, anOutState, _ in self._transitions:
             if anInState == inState and anInputSymbol == inputSymbol:
                 raise ValueError(
                     "already have transition from {} via {}".format(
@@ -123,7 +123,7 @@ class Automaton(object):
         """
         A 2-tuple of (outState, outputSymbols) for inputSymbol.
         """
-        for (anInState, anInputSymbol, outState, outputSymbols) in self._transitions:
+        for anInState, anInputSymbol, outState, outputSymbols in self._transitions:
             if (inState, inputSymbol) == (anInState, anInputSymbol):
                 return (outState, list(outputSymbols))
         raise NoTransition(state=inState, symbol=inputSymbol)

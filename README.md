@@ -1,10 +1,10 @@
-# Automat #
+# Automat
 
 [![Documentation Status](https://readthedocs.org/projects/automat/badge/?version=latest)](http://automat.readthedocs.io/en/latest/)
 [![Build Status](https://github.com/glyph/automat/actions/workflows/ci.yml/badge.svg?branch=trunk)](https://github.com/glyph/automat/actions/workflows/ci.yml?query=branch%3Atrunk)
 [![Coverage Status](http://codecov.io/github/glyph/automat/coverage.svg?branch=trunk)](http://codecov.io/github/glyph/automat?branch=trunk)
 
-## Self-service finite-state machines for the programmer on the go. ##
+## Self-service finite-state machines for the programmer on the go.
 
 Automat is a library for concise, idiomatic Python expression of finite-state
 automata (particularly deterministic finite-state transducers).
@@ -17,25 +17,25 @@ Overview and presentation by **Glyph Lefkowitz** at the first talk of the first 
 Presentation by **Clinton Roy** at PyCon Australia, on August 6th 2017:  
 [![Clinton Roy - State Machines - Pycon Australia 2017](https://img.youtube.com/vi/TedUKXhu9kE/0.jpg)](https://www.youtube.com/watch?v=TedUKXhu9kE)
 
-### Why use state machines? ###
+### Why use state machines?
 
 Sometimes you have to create an object whose behavior varies with its state,
 but still wishes to present a consistent interface to its callers.
 
-For example, let's say you're writing the software for a coffee machine.  It
+For example, let's say you're writing the software for a coffee machine. It
 has a lid that can be opened or closed, a chamber for water, a chamber for
 coffee beans, and a button for "brew".
 
-There are a number of possible states for the coffee machine.  It might or
-might not have water.  It might or might not have beans.  The lid might be open
-or closed.  The "brew" button should only actually attempt to brew coffee in
+There are a number of possible states for the coffee machine. It might or
+might not have water. It might or might not have beans. The lid might be open
+or closed. The "brew" button should only actually attempt to brew coffee in
 one of these configurations, and the "open lid" button should only work if the
 coffee is not, in fact, brewing.
 
 With diligence and attention to detail, you can implement this correctly using
 a collection of attributes on an object; `has_water`, `has_beans`,
-`is_lid_open` and so on.  However, you have to keep all these attributes
-consistent.  As the coffee maker becomes more complex - perhaps you add an
+`is_lid_open` and so on. However, you have to keep all these attributes
+consistent. As the coffee maker becomes more complex - perhaps you add an
 additional chamber for flavorings so you can make hazelnut coffee, for
 example - you have to keep adding more and more checks and more and more
 reasoning about which combinations of states are allowed.
@@ -50,7 +50,7 @@ You can read about state machines and their advantages for Python programmers
 in more detail [in this excellent article by Jean-Paul
 Calderone](https://web.archive.org/web/20160507053658/https://clusterhq.com/2013/12/05/what-is-a-state-machine/).
 
-### What makes Automat different? ###
+### What makes Automat different?
 
 There are
 [dozens of libraries on PyPI implementing state machines](https://pypi.org/search/?q=finite+state+machine).
@@ -58,9 +58,9 @@ So it behooves me to say why yet another one would be a good idea.
 
 Automat is designed around this principle: while organizing your code around
 state machines is a good idea, your callers don't, and shouldn't have to, care
-that you've done so.  In Python, the "input" to a stateful system is a method
+that you've done so. In Python, the "input" to a stateful system is a method
 call; the "output" may be a method call, if you need to invoke a side effect,
-or a return value, if you are just performing a computation in memory.  Most
+or a return value, if you are just performing a computation in memory. Most
 other state-machine libraries require you to explicitly create an input object,
 provide that object to a generic "input" method, and then receive results,
 sometimes in terms of that library's interfaces and sometimes in terms of
@@ -87,7 +87,7 @@ class CoffeeBrewer(object):
 ```
 
 and then you would break the above logic into two pieces - the `brew_button`
-*input*, declared like so:
+_input_, declared like so:
 
 ```python
     @_machine.input()
@@ -95,9 +95,9 @@ and then you would break the above logic into two pieces - the `brew_button`
         "The user pressed the 'brew' button."
 ```
 
-It wouldn't do any good to declare a method *body* on this, however, because
+It wouldn't do any good to declare a method _body_ on this, however, because
 input methods don't actually execute their bodies when called; doing actual
-work is the *output*'s job:
+work is the _output_'s job:
 
 ```python
     @_machine.output()
@@ -106,7 +106,7 @@ work is the *output*'s job:
         self._heating_element.turn_on()
 ```
 
-As well as a couple of *states* - and for simplicity's sake let's say that the
+As well as a couple of _states_ - and for simplicity's sake let's say that the
 only two states are `have_beans` and `dont_have_beans`:
 
 ```python
@@ -145,7 +145,7 @@ decorated with `_machine.state`:
                     outputs=[_heat_the_heating_element])
 ```
 
-To *users* of this coffee machine class though, it still looks like a POPO
+To _users_ of this coffee machine class though, it still looks like a POPO
 (Plain Old Python Object):
 
 ```python
@@ -154,8 +154,8 @@ To *users* of this coffee machine class though, it still looks like a POPO
 >>> coffee_machine.brew_button()
 ```
 
-All of the *inputs* are provided by calling them like methods, all of the
-*outputs* are automatically invoked when they are produced according to the
+All of the _inputs_ are provided by calling them like methods, all of the
+_outputs_ are automatically invoked when they are produced according to the
 outputs specified to `upon` and all of the states are simply opaque tokens -
 although the fact that they're defined as methods like inputs and outputs
 allows you to put docstrings on them easily to document them.
@@ -166,8 +166,8 @@ Don't do that.
 
 One major reason for having a state machine is that you want the callers of the
 state machine to just provide the appropriate input to the machine at the
-appropriate time, and *not have to check themselves* what state the machine is
-in.  So if you are tempted to write some code like this:
+appropriate time, and _not have to check themselves_ what state the machine is
+in. So if you are tempted to write some code like this:
 
 ```python
 if connection_state_machine.state == "CONNECTED":
@@ -210,11 +210,11 @@ remains within the state machine itself.
 ## Input for Inputs and Output for Outputs
 
 Quite often you want to be able to pass parameters to your methods, as well as
-inspecting their results.  For example, when you brew the coffee, you might
+inspecting their results. For example, when you brew the coffee, you might
 expect a cup of coffee to result, and you would like to see what kind of coffee
-it is.  And if you were to put delicious hand-roasted small-batch artisanal
-beans into the machine, you would expect a *better* cup of coffee than if you
-were to use mass-produced beans.  You would do this in plain old Python by
+it is. And if you were to put delicious hand-roasted small-batch artisanal
+beans into the machine, you would expect a _better_ cup of coffee than if you
+were to use mass-produced beans. You would do this in plain old Python by
 adding a parameter, so that's how you do it in Automat as well.
 
 ```python
@@ -223,10 +223,10 @@ adding a parameter, so that's how you do it in Automat as well.
         "The user put in some beans."
 ```
 
-However, one important difference here is that *we can't add any
-implementation code to the input method*.  Inputs are purely a declaration of
-the interface; the behavior must all come from outputs.  Therefore, the change
-in the state of the coffee machine must be represented as an output.  We can
+However, one important difference here is that _we can't add any
+implementation code to the input method_. Inputs are purely a declaration of
+the interface; the behavior must all come from outputs. Therefore, the change
+in the state of the coffee machine must be represented as an output. We can
 add an output method like this:
 
 ```python
@@ -252,10 +252,10 @@ coffee_machine.put_in_beans("real good beans")
 
 the machine will remember the beans for later.
 
-So how do we get the beans back out again?  One of our outputs needs to have a
-return value.  It would make sense if our `brew_button` method returned the cup
-of coffee that it made, so we should add an output.  So, in addition to heating
-the heating element, let's add a return value that describes the coffee.  First
+So how do we get the beans back out again? One of our outputs needs to have a
+return value. It would make sense if our `brew_button` method returned the cup
+of coffee that it made, so we should add an output. So, in addition to heating
+the heating element, let's add a return value that describes the coffee. First
 a new output:
 
 ```python
@@ -287,9 +287,9 @@ Now, we can call it:
 Except... wait a second, what's that `None` doing there?
 
 Since every input can produce multiple outputs, in automat, the default return
-value from every input invocation is a `list`.  In this case, we have both
+value from every input invocation is a `list`. In this case, we have both
 `_heat_the_heating_element` and `_describe_coffee` outputs, so we're seeing
-both of their return values.  However, this can be customized, with the
+both of their return values. However, this can be customized, with the
 `collector` argument to `upon`; the `collector` is a callable which takes an
 iterable of all the outputs' return values and "collects" a single return value
 to return to the caller of the state machine.
@@ -339,7 +339,7 @@ class LightSwitch(object):
 ```
 
 In this case, we've chosen a serialized representation for each state via the
-`serialized` argument.  The on state is represented by the string `"on"`, and
+`serialized` argument. The on state is represented by the string `"on"`, and
 the off state is represented by the string `"off"`.
 
 Now, let's just add an input that lets us tell if the switch is on or not.
@@ -360,12 +360,12 @@ Now, let's just add an input that lets us tell if the switch is on or not.
                    collector=next)
 ```
 
-To save the state, we have the `MethodicalMachine.serializer()` method.  A
+To save the state, we have the `MethodicalMachine.serializer()` method. A
 method decorated with `@serializer()` gets an extra argument injected at the
-beginning of its argument list: the serialized identifier for the state.  In
-this case, either `"on"` or `"off"`.  Since state machine output methods can
+beginning of its argument list: the serialized identifier for the state. In
+this case, either `"on"` or `"off"`. Since state machine output methods can
 also affect other state on the object, a serializer method is expected to
-return *all* relevant state for serialization.
+return _all_ relevant state for serialization.
 
 For our simple light switch, such a method might look like this:
 
@@ -375,16 +375,16 @@ For our simple light switch, such a method might look like this:
         return {"is-it-on": state}
 ```
 
-Serializers can be public methods, and they can return whatever you like.  If
+Serializers can be public methods, and they can return whatever you like. If
 necessary, you can have different serializers - just multiple methods decorated
 with `@_machine.serializer()` - for different formats; return one data-structure
 for JSON, one for XML, one for a database row, and so on.
 
 When it comes time to unserialize, though, you generally want a private method,
 because an unserializer has to take a not-fully-initialized instance and
-populate it with state.  It is expected to *return* the serialized machine
+populate it with state. It is expected to _return_ the serialized machine
 state token that was passed to the serializer, but it can take whatever
-arguments you like.  Of course, in order to return that, it probably has to
+arguments you like. Of course, in order to return that, it probably has to
 take it somewhere in its arguments, so it will generally take whatever a paired
 serializer has returned as an argument.
 
@@ -428,3 +428,19 @@ True
 More comprehensive (tested, working) examples are present in `docs/examples`.
 
 Go forth and machine all the state!
+
+# Development
+
+```python
+# create virtual environment
+virtualenv .venv
+# use virtual environment (you may have to add .csh, .fish, .nu or .ps1)
+./.venv/bin/activate
+# install with
+pip install .[dev]
+# test
+tox -s
+# build packages
+python -m build --wheel
+
+```

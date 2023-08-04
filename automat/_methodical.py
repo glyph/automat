@@ -1,16 +1,14 @@
 # -*- test-case-name: automat._test.test_methodical -*-
 
 import collections
+from dataclasses import MISSING, dataclass, field
 from functools import wraps
-from itertools import count
-
 from inspect import getfullargspec as getArgsSpec
+from itertools import count
+from typing import Any
 
-import attr
-
-from ._core import Transitioner, Automaton
+from ._core import Automaton, Transitioner
 from ._introspection import preserveName
-
 
 ArgSpec = collections.namedtuple(
     "ArgSpec",
@@ -84,243 +82,6 @@ def _keywords_only(f):
         return f(self, **kw)
 
     return g
-
-
-@attr.s(frozen=True)
-class MethodicalState(object):
-    """
-    A state for a L{MethodicalMachine}.
-    """
-
-    machine = attr.ib(repr=False)
-    method = attr.ib()
-    serialized = attr.ib(repr=False)
-
-    def upon(self, input, enter=None, outputs=None, collector=list):
-        """
-        Declare a state transition within the :class:`automat.MethodicalMachine`
-        associated with this :class:`automat.MethodicalState`:
-        upon the receipt of the `input`, enter the `state`,
-        emitting each output in `outputs`.
-
-        :param MethodicalInput input: The input triggering a state transition.
-        :param MethodicalState enter: The resulting state.
-        :param Iterable[MethodicalOutput] outputs: The outputs to be triggered
-            as a result of the declared state transition.
-        :param Callable collector: The function to be used when collecting
-            output return values.
-
-        :raises TypeError: if any of the `outputs` signatures do not match
-            the `inputs` signature.
-        :raises ValueError: if the state transition from `self` via `input`
-            has already been defined.
-        """
-        if enter is None:
-            enter = self
-        if outputs is None:
-            outputs = []
-        inputArgs = _getArgNames(input.argSpec)
-        for output in outputs:
-            outputArgs = _getArgNames(output.argSpec)
-            if not outputArgs.issubset(inputArgs):
-                raise TypeError(
-                    "method {input} signature {inputSignature} "
-                    "does not match output {output} "
-                    "signature {outputSignature}".format(
-                        input=input.method.__name__,
-                        output=output.method.__name__,
-                        inputSignature=getArgsSpec(input.method),
-                        outputSignature=getArgsSpec(output.method),
-                    )
-                )
-        self.machine._oneTransition(self, input, enter, outputs, collector)
-
-    def _name(self):
-        return self.method.__name__
-
-
-def _transitionerFromInstance(oself, symbol, automaton):
-    """
-    Get a L{Transitioner}
-    """
-    transitioner = getattr(oself, symbol, None)
-    if transitioner is None:
-        transitioner = Transitioner(
-            automaton,
-            automaton.initialState,
-        )
-        setattr(oself, symbol, transitioner)
-    return transitioner
-
-
-def _empty():
-    pass
-
-
-def _docstring():
-    """docstring"""
-
-
-def assertNoCode(inst, attribute, f):
-    # The function body must be empty, i.e. "pass" or "return None", which
-    # both yield the same bytecode: LOAD_CONST (None), RETURN_VALUE. We also
-    # accept functions with only a docstring, which yields slightly different
-    # bytecode, because the "None" is put in a different constant slot.
-
-    # Unfortunately, this does not catch function bodies that return a
-    # constant value, e.g. "return 1", because their code is identical to a
-    # "return None". They differ in the contents of their constant table, but
-    # checking that would require us to parse the bytecode, find the index
-    # being returned, then making sure the table has a None at that index.
-
-    if f.__code__.co_code not in (_empty.__code__.co_code, _docstring.__code__.co_code):
-        raise ValueError("function body must be empty")
-
-
-def _filterArgs(args, kwargs, inputSpec, outputSpec):
-    """
-    Filter out arguments that were passed to input that output won't accept.
-
-    :param tuple args: The *args that input received.
-    :param dict kwargs: The **kwargs that input received.
-    :param ArgSpec inputSpec: The input's arg spec.
-    :param ArgSpec outputSpec: The output's arg spec.
-    :return: The args and kwargs that output will accept.
-    :rtype: Tuple[tuple, dict]
-    """
-    named_args = tuple(zip(inputSpec.args[1:], args))
-    if outputSpec.varargs:
-        # Only return all args if the output accepts *args.
-        return_args = args
-    else:
-        # Filter out arguments that don't appear
-        # in the output's method signature.
-        return_args = [v for n, v in named_args if n in outputSpec.args]
-
-    # Get any of input's default arguments that were not passed.
-    passed_arg_names = tuple(kwargs)
-    for name, value in named_args:
-        passed_arg_names += (name, value)
-    defaults = zip(inputSpec.args[::-1], inputSpec.defaults[::-1])
-    full_kwargs = {n: v for n, v in defaults if n not in passed_arg_names}
-    full_kwargs.update(kwargs)
-
-    if outputSpec.varkw:
-        # Only pass all kwargs if the output method accepts **kwargs.
-        return_kwargs = full_kwargs
-    else:
-        # Filter out names that the output method does not accept.
-        all_accepted_names = outputSpec.args[1:] + outputSpec.kwonlyargs
-        return_kwargs = {
-            n: v for n, v in full_kwargs.items() if n in all_accepted_names
-        }
-
-    return return_args, return_kwargs
-
-
-@attr.s(eq=False, hash=False)
-class MethodicalInput(object):
-    """
-    An input for a L{MethodicalMachine}.
-    """
-
-    automaton = attr.ib(repr=False)
-    method = attr.ib(validator=assertNoCode)
-    symbol = attr.ib(repr=False)
-    collectors = attr.ib(default=attr.Factory(dict), repr=False)
-    argSpec = attr.ib(init=False, repr=False)
-
-    @argSpec.default
-    def _buildArgSpec(self):
-        return _getArgSpec(self.method)
-
-    def __get__(self, oself, type=None):
-        """
-        Return a function that takes no arguments and returns values returned
-        by output functions produced by the given L{MethodicalInput} in
-        C{oself}'s current state.
-        """
-        transitioner = _transitionerFromInstance(oself, self.symbol, self.automaton)
-
-        @preserveName(self.method)
-        @wraps(self.method)
-        def doInput(*args, **kwargs):
-            self.method(oself, *args, **kwargs)
-            previousState = transitioner._state
-            (outputs, outTracer) = transitioner.transition(self)
-            collector = self.collectors[previousState]
-            values = []
-            for output in outputs:
-                if outTracer:
-                    outTracer(output._name())
-                a, k = _filterArgs(args, kwargs, self.argSpec, output.argSpec)
-                value = output(oself, *a, **k)
-                values.append(value)
-            return collector(values)
-
-        return doInput
-
-    def _name(self):
-        return self.method.__name__
-
-
-@attr.s(frozen=True)
-class MethodicalOutput(object):
-    """
-    An output for a L{MethodicalMachine}.
-    """
-
-    machine = attr.ib(repr=False)
-    method = attr.ib()
-    argSpec = attr.ib(init=False, repr=False)
-
-    @argSpec.default
-    def _buildArgSpec(self):
-        return _getArgSpec(self.method)
-
-    def __get__(self, oself, type=None):
-        """
-        Outputs are private, so raise an exception when we attempt to get one.
-        """
-        raise AttributeError(
-            "{cls}.{method} is a state-machine output method; "
-            "to produce this output, call an input method instead.".format(
-                cls=type.__name__, method=self.method.__name__
-            )
-        )
-
-    def __call__(self, oself, *args, **kwargs):
-        """
-        Call the underlying method.
-        """
-        return self.method(oself, *args, **kwargs)
-
-    def _name(self):
-        return self.method.__name__
-
-
-@attr.s(eq=False, hash=False)
-class MethodicalTracer(object):
-    automaton = attr.ib(repr=False)
-    symbol = attr.ib(repr=False)
-
-    def __get__(self, oself, type=None):
-        transitioner = _transitionerFromInstance(oself, self.symbol, self.automaton)
-
-        def setTrace(tracer):
-            transitioner.setTrace(tracer)
-
-        return setTrace
-
-
-counter = count()
-
-
-def gensym():
-    """
-    Create a unique Python identifier.
-    """
-    return "_symbol_" + str(next(counter))
 
 
 class MethodicalMachine(object):
@@ -489,3 +250,258 @@ class MethodicalMachine(object):
             inputAsString=lambda input: input.method.__name__,
             outputAsString=lambda output: output.method.__name__,
         )
+
+
+@dataclass(frozen=True)
+class MethodicalState(object):
+    """
+    A state for a L{MethodicalMachine}.
+    """
+
+    machine: MethodicalMachine = field(repr=False)
+    method: Any
+    serialized: Any = field(repr=False)
+
+    def upon(self, input, enter=None, outputs=None, collector=list):
+        """
+        Declare a state transition within the :class:`automat.MethodicalMachine`
+        associated with this :class:`automat.MethodicalState`:
+        upon the receipt of the `input`, enter the `state`,
+        emitting each output in `outputs`.
+
+        :param MethodicalInput input: The input triggering a state transition.
+        :param MethodicalState enter: The resulting state.
+        :param Iterable[MethodicalOutput] outputs: The outputs to be triggered
+            as a result of the declared state transition.
+        :param Callable collector: The function to be used when collecting
+            output return values.
+
+        :raises TypeError: if any of the `outputs` signatures do not match
+            the `inputs` signature.
+        :raises ValueError: if the state transition from `self` via `input`
+            has already been defined.
+        """
+        if enter is None:
+            enter = self
+        if outputs is None:
+            outputs = []
+        inputArgs = _getArgNames(input.argSpec)
+        for output in outputs:
+            outputArgs = _getArgNames(output.argSpec)
+            if not outputArgs.issubset(inputArgs):
+                raise TypeError(
+                    "method {input} signature {inputSignature} "
+                    "does not match output {output} "
+                    "signature {outputSignature}".format(
+                        input=input.method.__name__,
+                        output=output.method.__name__,
+                        inputSignature=getArgsSpec(input.method),
+                        outputSignature=getArgsSpec(output.method),
+                    )
+                )
+        self.machine._oneTransition(self, input, enter, outputs, collector)
+
+    def _name(self):
+        return self.method.__name__
+
+
+def _transitionerFromInstance(oself, symbol, automaton):
+    """
+    Get a L{Transitioner}
+    """
+    transitioner = getattr(oself, symbol, None)
+    if transitioner is None:
+        transitioner = Transitioner(
+            automaton,
+            automaton.initialState,
+        )
+        setattr(oself, symbol, transitioner)
+    return transitioner
+
+
+def _empty():
+    pass
+
+
+def _docstring():
+    """docstring"""
+
+
+def assertNoCode(inst, attribute, f):
+    # The function body must be empty, i.e. "pass" or "return None", which
+    # both yield the same bytecode: LOAD_CONST (None), RETURN_VALUE. We also
+    # accept functions with only a docstring, which yields slightly different
+    # bytecode, because the "None" is put in a different constant slot.
+
+    # Unfortunately, this does not catch function bodies that return a
+    # constant value, e.g. "return 1", because their code is identical to a
+    # "return None". They differ in the contents of their constant table, but
+    # checking that would require us to parse the bytecode, find the index
+    # being returned, then making sure the table has a None at that index.
+
+    if f.__code__.co_code not in (_empty.__code__.co_code, _docstring.__code__.co_code):
+        raise ValueError("function body must be empty")
+
+
+class assertNoCodeDescriptor:
+    def __set_name__(self, owner, name):
+        self._name = "_" + name
+
+    def __get__(self, obj, type):
+        return getattr(obj, self._name)
+
+    def __set__(self, obj, value):
+        if value.__code__.co_code not in (
+            _empty.__code__.co_code,
+            _docstring.__code__.co_code,
+        ):
+            raise ValueError("function body must be empty")
+
+        setattr(obj, self._name, value)
+
+
+def _filterArgs(args, kwargs, inputSpec, outputSpec):
+    """
+    Filter out arguments that were passed to input that output won't accept.
+
+    :param tuple args: The *args that input received.
+    :param dict kwargs: The **kwargs that input received.
+    :param ArgSpec inputSpec: The input's arg spec.
+    :param ArgSpec outputSpec: The output's arg spec.
+    :return: The args and kwargs that output will accept.
+    :rtype: Tuple[tuple, dict]
+    """
+    named_args = tuple(zip(inputSpec.args[1:], args))
+    if outputSpec.varargs:
+        # Only return all args if the output accepts *args.
+        return_args = args
+    else:
+        # Filter out arguments that don't appear
+        # in the output's method signature.
+        return_args = [v for n, v in named_args if n in outputSpec.args]
+
+    # Get any of input's default arguments that were not passed.
+    passed_arg_names = tuple(kwargs)
+    for name, value in named_args:
+        passed_arg_names += (name, value)
+    defaults = zip(inputSpec.args[::-1], inputSpec.defaults[::-1])
+    full_kwargs = {n: v for n, v in defaults if n not in passed_arg_names}
+    full_kwargs.update(kwargs)
+
+    if outputSpec.varkw:
+        # Only pass all kwargs if the output method accepts **kwargs.
+        return_kwargs = full_kwargs
+    else:
+        # Filter out names that the output method does not accept.
+        all_accepted_names = outputSpec.args[1:] + outputSpec.kwonlyargs
+        return_kwargs = {
+            n: v for n, v in full_kwargs.items() if n in all_accepted_names
+        }
+
+    return return_args, return_kwargs
+
+
+@dataclass(eq=False, unsafe_hash=False)
+class MethodicalInput(object):
+    """
+    An input for a L{MethodicalMachine}.
+    """
+
+    automaton: Automaton = field(repr=False)
+    symbol: str = field(repr=False)
+    argSpec: ArgSpec = field(init=False, repr=False)
+    method: assertNoCodeDescriptor = assertNoCodeDescriptor()
+    collectors: dict = field(default_factory=dict, repr=False)
+
+    def __post_init__(self):
+        if getattr(self, "argSpec", MISSING) is MISSING:
+            self.argSpec = _getArgSpec(self.method)
+
+    def __get__(self, oself, type=None):
+        """
+        Return a function that takes no arguments and returns values returned
+        by output functions produced by the given L{MethodicalInput} in
+        C{oself}'s current state.
+        """
+        transitioner = _transitionerFromInstance(oself, self.symbol, self.automaton)
+
+        @preserveName(self.method)
+        @wraps(self.method)
+        def doInput(*args, **kwargs):
+            self.method(oself, *args, **kwargs)
+            previousState = transitioner._state
+            (outputs, outTracer) = transitioner.transition(self)
+            collector = self.collectors[previousState]
+            values = []
+            for output in outputs:
+                if outTracer:
+                    outTracer(output._name())
+                a, k = _filterArgs(args, kwargs, self.argSpec, output.argSpec)
+                value = output(oself, *a, **k)
+                values.append(value)
+            return collector(values)
+
+        return doInput
+
+    def _name(self):
+        return self.method.__name__
+
+
+@dataclass(frozen=True)
+class MethodicalOutput(object):
+    """
+    An output for a L{MethodicalMachine}.
+    """
+
+    machine: MethodicalMachine = field(repr=False)
+    method: Any
+    argSpec: ArgSpec = field(init=False, repr=False)
+
+    def __post_init__(self):
+        if getattr(self, "argSpec", MISSING) is MISSING:
+            # subvert frozen
+            object.__setattr__(self, "argSpec", _getArgSpec(self.method))
+
+    def __get__(self, oself, type=None):
+        """
+        Outputs are private, so raise an exception when we attempt to get one.
+        """
+        raise AttributeError(
+            "{cls}.{method} is a state-machine output method; "
+            "to produce this output, call an input method instead.".format(
+                cls=type.__name__, method=self.method.__name__
+            )
+        )
+
+    def __call__(self, oself, *args, **kwargs):
+        """
+        Call the underlying method.
+        """
+        return self.method(oself, *args, **kwargs)
+
+    def _name(self):
+        return self.method.__name__
+
+
+@dataclass(eq=False, unsafe_hash=False)
+class MethodicalTracer(object):
+    automaton: Automaton = field(repr=False)
+    symbol: str = field(repr=False)
+
+    def __get__(self, oself, type=None):
+        transitioner = _transitionerFromInstance(oself, self.symbol, self.automaton)
+
+        def setTrace(tracer):
+            transitioner.setTrace(tracer)
+
+        return setTrace
+
+
+counter = count()
+
+
+def gensym():
+    """
+    Create a unique Python identifier.
+    """
+    return "_symbol_" + str(next(counter))

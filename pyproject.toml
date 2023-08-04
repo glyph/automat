@@ -1,0 +1,38 @@
+
+
+[project]
+name = "Automat"
+authors = [
+    {name = "Glyph", email = "glyph@twistedmatrix.com"},
+]
+description = "Self-service finite-state machines for the programmer on the go."
+readme = "README.md"
+keywords = ["fsm", "finite state machine", "automata"]
+license = {text = "MIT"}
+classifiers = [
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.5",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+]
+dynamic = ["version"]
+
+
+[project.optional-dependencies]
+visualize = ["graphviz>0.5.1", "Twisted>=16.1.1"]
+dev = ["tox", "build"]
+
+[project.scripts]
+automat-visualize = "automat._visualize:tool"
+
+[tool.setuptools_scm]
+
+
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"

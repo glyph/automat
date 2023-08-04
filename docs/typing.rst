@@ -34,14 +34,14 @@ consider the following:
 
 .. code::
 
-    import attr
+    from dataclasses import dataclass, field
     import automat
     from typing import Optional
 
-    @attr.s(auto_attribs=True)
+    @dataclass
     class MaybeValue:
         _machine = automat.MethodicalMachine()
-        _value: Optional[float] = attr.ib(default=None)
+        _value: Optional[float] = field(default=None)
 
         @_machine.input()
         def set_value(self, value: float) -> None:
@@ -92,4 +92,3 @@ with a line
 :code:`assert self._value is not None`
 will satisfy
 :code:`mypy`.
-

@@ -1,14 +1,11 @@
-from __future__ import print_function
 import functools
-
 import os
 import subprocess
+from dataclasses import dataclass, field
+from typing import Any
 from unittest import TestCase, skipIf
 
-import attr
-
 from .._methodical import MethodicalMachine
-
 from .test_discover import isTwistedInstalled
 
 
@@ -104,13 +101,13 @@ class ElementMakerTests(TestCase):
         self.assertEqual(expected, self.elementMaker("div"))
 
 
-@attr.s
+@dataclass
 class HTMLElement(object):
     """Holds an HTML element, as created by elementMaker."""
 
-    name = attr.ib()
-    children = attr.ib()
-    attributes = attr.ib()
+    name: str = field()
+    children: Any = field()
+    attributes: Any = field()
 
 
 def findElements(element, predicate):
