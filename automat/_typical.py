@@ -12,6 +12,7 @@ from typing import (
     ClassVar,
     Dict,
     Generic,
+    Iterable,
     List,
     Mapping,
     NoReturn,
@@ -81,8 +82,8 @@ class CouldNotFindAutoParam(RuntimeError):
 
 
 def _magicValueForParameter(
-    pname: str,
-    ptype: Type[object],
+    parameterName: str,
+    parameterType: Type[object],
     transitionSignature: Signature | None,
     passedParams: Dict[str, object],
     stateCore: object,
@@ -106,33 +107,40 @@ def _magicValueForParameter(
 
         4. If it's the type of the state core, pass the state core.
     """
-    # TODO: this needs to do some prechecking so we don't get runtime errors if
-    # we can avoid it; specifically we can import-time check to see if there
-    # are any transition paths into a state (B) that requires another state (A)
-    # which do not pass through the required state (A), and checking the
-    # matching name/type annotations on both the state core and the transition
-    # methods.
-    if transitionSignature is not None and pname in transitionSignature.parameters:
-        transitionParam = transitionSignature.parameters[pname]
+    # TODO: this needs to do some prechecking so we push as many errors to
+    # import time as we possibly can; specifically we can import-time check to
+    # see if there are any transition paths into a state (B) that requires
+    # another state (A) which do not pass through the required state (A), and
+    # checking the matching name/type annotations on both the state core and
+    # the transition methods.
+    if (
+        transitionSignature is not None
+        and parameterName in transitionSignature.parameters
+    ):
+        transitionParam = transitionSignature.parameters[parameterName]
         # type-matching, check for Any, check for lacking annotation?
-        if transitionParam.annotation == ptype:
-            return passedParams[pname]
-    if (it := getattr(stateCore, pname, None)) is not None:
+        if transitionParam.annotation == parameterType:
+            return passedParams[parameterName]
+    if (it := getattr(stateCore, parameterName, None)) is not None:
+        # This is probably way too much magic to do by default.  It might make
+        # the most sense to just force everybody to wrap the whole state core
+        # if they want to reference its state.
         return it
     # TODO: better keys for existingStateCluster
-    if ptype.__name__ in existingStateCluster:
-        return existingStateCluster[ptype.__name__]
-    if ptype is type(stateCore):
+    if parameterType.__name__ in existingStateCluster:
+        return existingStateCluster[parameterType.__name__]
+    if parameterType is type(stateCore):
         return stateCore
-    if ptype in inputProtocols:
+    if parameterType in inputProtocols:
         return syntheticSelf
-    raise CouldNotFindAutoParam(f"Could not find parameter {pname} anywhere.")
+    raise CouldNotFindAutoParam(f"Could not find parameter {parameterName} anywhere.")
 
 
 def _liveSignature(method: Callable[..., object]) -> Signature:
     """
     Get a signature with evaluated annotations.
     """
+    # TODO: could this be replaced with get_type_hints?
     result = signature(method)
     for param in result.parameters.values():
         annotation = param.annotation
@@ -184,13 +192,12 @@ def _buildNewState(
             inputProtocols,
             syntheticSelf,
         )
-
     return stateFactory(**k)
 
 
 def _updateState(
-    oldState: str | None,
     self: _TypicalInstance[InputsProto, StateCore],
+    oldState: str | None,
     a: Tuple[object, ...],
     kw: Dict[str, object],
     stateFactories: Dict[str, Callable[..., UserStateType]],
@@ -236,7 +243,7 @@ def _bindableTransitionMethod(
         oldState = self._transitioner._state
         stateObject = self._stateCluster[oldState]
         [[outputMethodName], tracer] = self._transitioner.transition(inputMethodName)
-        _updateState(oldState, self, a, kw, stateFactories, inputMethod, inputProtocols)
+        _updateState(self, oldState, a, kw, stateFactories, inputMethod, inputProtocols)
         if outputMethodName is None:
             raise RuntimeError(f"unhandled: state:{oldState} input:{inputMethodName}")
         realMethod = getattr(stateObject, outputMethodName)
@@ -307,7 +314,7 @@ class _TypicalClass(
             Transitioner(self._automaton, self._initialState.__name__),
         )
         _updateState(
-            None, result, (), {}, self._stateFactories, None, self._inputProtocols
+            result, None, (), {}, self._stateFactories, None, self._inputProtocols
         )
         return result  # type: ignore
 
@@ -384,6 +391,50 @@ class Handler(Protocol[InputsProtoInv, SelfCon, ThisInputArgs, R, SelfA, StateCo
         ...
 
 
+AnyHandler = Handler[object, object, ..., object, object, object]
+
+
+def _stateInputs(stateClass: type[object]) -> Iterable[tuple[str, str, str]]:
+    """
+    Extract all input-handling methods from a given state class, returning a
+    3-tuple of:
+
+        1. the name of the I{output method} from the state class; i.e. the
+           method that has actually been defined here.
+
+        2. the name of the I{input method} from the inputs C{Protocol} on the
+           state machine
+
+        3. the name of the I{state factory} (as stored in
+           L{_TypicalClass._stateFactories}) to invoke, in order to build the
+           state to transition to after the aforementioned state-machine input
+           has been handled by the aforementioned state output method.
+    """
+    for outputMethodName in dir(stateClass):
+        maybeOutputMethod = getattr(stateClass, outputMethodName)
+        if not hasattr(maybeOutputMethod, "__automat_handler__"):
+            continue
+        outputMethod: AnyHandler = maybeOutputMethod
+        [inputMethod, enterParameter] = outputMethod.__automat_handler__
+        newStateFactory: Callable[..., object]
+        if enterParameter is not None:
+            newStateFactory = enterParameter
+        else:
+            newStateFactory = stateClass
+        if sys.version_info >= (3, 9):
+            for enterAnnotation in (
+                each
+                for each in getattr(
+                    get_type_hints(outputMethod, include_extras=True).get("return"),
+                    "__metadata__",
+                    (),
+                )
+                if isinstance(each, Enter)
+            ):
+                newStateFactory = enterAnnotation.state
+        yield outputMethodName, inputMethod.__name__, newStateFactory.__name__
+
+
 @dataclass
 class TypicalBuilder(Generic[InputsProto, StateCore, P]):
     """
@@ -421,41 +472,13 @@ class TypicalBuilder(Generic[InputsProto, StateCore, P]):
                 ["__dict__", "__weakref__", *dir(Protocol)]
             )
             for stateClass in [*self._stateClasses, self._errorState]:
-                stateFactories[stateClass.__name__] = stateClass
-                for outputMethodName in dir(stateClass):
-                    outputMethod = getattr(stateClass, outputMethodName)
-                    ah = getattr(outputMethod, "__automat_handler__", None)
-                    if ah is None:
-                        continue
-                    inputMethod: Callable[..., object]
-                    enterParameter: Optional[Type[object]]
-                    [inputMethod, enterParameter] = ah
-                    newStateType = (
-                        stateClass if enterParameter is None else enterParameter
-                    )
-                    if sys.version_info >= (3, 9):
-                        for enterAnnotation in (
-                            each
-                            for each in getattr(
-                                get_type_hints(outputMethod, include_extras=True).get(
-                                    "return"
-                                ),
-                                "__metadata__",
-                                (),
-                            )
-                            if isinstance(each, Enter)
-                        ):
-                            newStateType = enterAnnotation.state
-                    inputName = inputMethod.__name__
-                    if inputName not in possibleInputs:
-                        # TODO: arrogate these to the correct place.
-                        continue
-                    automaton.addTransition(
-                        stateClass.__name__,
-                        inputName,
-                        newStateType.__name__,
-                        [outputMethodName],
-                    )
+                stateName = stateClass.__name__
+                stateFactories[stateName] = stateClass
+                for (outputName, inputName, newStateName) in _stateInputs(stateClass):
+                    if inputName in possibleInputs:
+                        automaton.addTransition(
+                            stateName, inputName, newStateName, [outputName]
+                        )
             for eachInput in possibleInputs:
                 ns[eachInput] = _bindableTransitionMethod(
                     getattr(eachStateProtocol, eachInput),
