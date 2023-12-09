@@ -153,12 +153,140 @@ def _liveSignature(method: Callable[..., object]) -> Signature:
     return result
 
 
+class ValueBuilder(Protocol):
+    def __call__(
+        self,
+        syntheticSelf: _TypicalInstance[InputsProto, StateCore],
+        stateCore: object,
+        existingStateCluster: Mapping[str, object],
+    ) -> object:
+        ...
+
+
+class StateBuilder(Protocol):
+    def __call__(
+        self,
+        syntheticSelf: _TypicalInstance[InputsProto, StateCore],
+        stateCore: object,
+        existingStateCluster: Mapping[str, object],
+        args: Tuple[object, ...],
+        kwargs: Dict[str, object],
+    ) -> object:
+        ...
+
+
+def _getOtherState(name: str) -> ValueBuilder:
+    def _otherState(
+        syntheticSelf: _TypicalInstance[InputsProto, StateCore],
+        stateCore: object,
+        existingStateCluster: Mapping[str, object],
+    ) -> object:
+        return existingStateCluster[name]
+
+    return _otherState
+
+
+def _getCore(
+    syntheticSelf: _TypicalInstance[InputsProto, StateCore],
+    stateCore: object,
+    existingStateCluster: Mapping[str, object],
+) -> object:
+    return stateCore
+
+
+def _getSynthSelf(
+    syntheticSelf: _TypicalInstance[InputsProto, StateCore],
+    stateCore: object,
+    existingStateCluster: Mapping[str, object],
+) -> object:
+    return syntheticSelf
+
+
+def _stateBuilder(
+    stateFactory: Callable[..., Any],
+    suppliers: list[tuple[str, ValueBuilder]] = [],
+):
+    def _(
+        syntheticSelf: _TypicalInstance[InputsProto, StateCore],
+        stateCore: object,
+        existingStateCluster: Mapping[str, object],
+        args: Tuple[object, ...],
+        kwargs: Dict[str, object],
+    ) -> object:
+        toPass: Dict[str, object] = {}
+        toPass.update(kwargs)  # here's where we get the transition-supplied
+        # parameters
+        return stateFactory(
+            **toPass,
+            **{
+                extraParamName: extraParamFactory(
+                    syntheticSelf, stateCore, existingStateCluster
+                )
+                for (extraParamName, extraParamFactory) in suppliers
+            },
+        )
+
+    return _
+
+
+def _buildStateBuilder(
+    stateCoreType: type[object],
+    stateFactory: Callable[..., Any],
+    stateFactories: Dict[str, Callable[..., UserStateType]],
+    transitionMethod: Any,
+    inputProtocols: frozenset[ProtocolAtRuntime[object]],
+) -> StateBuilder:
+    """
+    We want to build a factory that takes live args/kwargs and translates them
+    into a state instance.
+
+    @param transitionMethod: The method from the state-machine protocol, which
+        documents its public parameters.
+    """
+    # the transition signature is empty / no arguments for the initial state
+    # build
+    transitionSignature = (
+        _liveSignature(transitionMethod)
+        if transitionMethod is not None
+        else Signature()
+    )
+    factorySignature = _liveSignature(stateFactory)
+
+    # All the parameters that the transition expects MUST be supplied by the
+    # caller; they will be passed along to the factory.  The factory should not
+    # supply them in other ways (default values will not be respected,
+    # attributes won't be pulled from the state core, etc)
+
+    def _valueSuppliers() -> Iterable[tuple[str, ValueBuilder]]:
+        for notSuppliedByTransitionName in set(factorySignature.parameters) - set(
+            transitionSignature.parameters
+        ):
+            # These are the parameters we will need to supply.
+            notSuppliedByTransition = factorySignature.parameters[
+                notSuppliedByTransitionName
+            ]
+            parameterType = notSuppliedByTransition.annotation
+            if parameterType.__name__ in stateFactories:
+                yield (
+                    (
+                        notSuppliedByTransitionName,
+                        _getOtherState(parameterType.__name__),
+                    )
+                )
+            if parameterType is stateCoreType:
+                yield ((notSuppliedByTransitionName, _getCore))
+            if parameterType in inputProtocols:
+                yield ((notSuppliedByTransitionName, _getSynthSelf))
+
+    return _stateBuilder(stateFactory, list(_valueSuppliers()))
+
+
 def _buildNewState(
     syntheticSelf: _TypicalInstance[InputsProto, StateCore],
     transitionMethod: Any,
     stateFactory: Callable[..., Any],
     stateCore: object,
-    args: Tuple[Any, ...],
+    args: Tuple[object, ...],
     kwargs: Dict[str, object],
     existingStateCluster: Mapping[str, object],
     inputProtocols: frozenset[ProtocolAtRuntime[object]],
@@ -198,8 +326,8 @@ def _buildNewState(
 def _updateState(
     self: _TypicalInstance[InputsProto, StateCore],
     oldState: str | None,
-    a: Tuple[object, ...],
-    kw: Dict[str, object],
+    args: Tuple[object, ...],
+    kwargs: Dict[str, object],
     stateFactories: Dict[str, Callable[..., UserStateType]],
     inputMethod: Callable[..., object] | None,
     inputProtocols: frozenset[ProtocolAtRuntime[object]],
@@ -214,8 +342,8 @@ def _updateState(
             inputMethod,
             stateFactory,
             self._stateCore,
-            a,
-            kw,
+            args,
+            kwargs,
             self._stateCluster,
             inputProtocols,
         )
@@ -447,6 +575,13 @@ def _stateInputs(stateClass: type[object]) -> Iterable[tuple[str, str, str]]:
         yield outputMethodName, inputMethod.__name__, newStateFactory.__name__
 
 
+METADATA_DETRITUS = frozenset(["__dict__", "__weakref__", *dir(Protocol)])
+"""
+The process of defining a Protocol, or any Python class really, leaves behind
+some extra junk which we cannot consider state-machine input methods.
+"""
+
+
 @dataclass
 class TypicalBuilder(Generic[InputsProto, StateCore, P]):
     """
@@ -481,9 +616,7 @@ class TypicalBuilder(Generic[InputsProto, StateCore, P]):
             "_stateFactories": stateFactories,
         }
         for eachStateProtocol in [self._stateProtocol, *self._privateProtocols]:
-            possibleInputs = set(dir(eachStateProtocol)) - set(
-                ["__dict__", "__weakref__", *dir(Protocol)]
-            )
+            possibleInputs = frozenset(dir(eachStateProtocol)) - METADATA_DETRITUS
             for stateClass in [*self._stateClasses, self._errorState]:
                 stateName = stateClass.__name__
                 stateFactories[stateName] = stateClass
