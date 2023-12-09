@@ -56,7 +56,7 @@ class TaskPerformer(object):
 
 #
 class ConnectionCoordinator(Protocol):
-    def start(self):
+    def start(self) -> None:
         "kick off the whole process"
 
     def requestReceived(self, r: Request) -> None:
@@ -97,12 +97,8 @@ def taskComplete(
         c.headroom()
 
 
-@machine.handle(ConnectionCoordinator.cleanup, enter=lambda: CleaningUp)
-# TODO: it would be neat to be able to read the explicit `self` annotation here
-# and automatically associate this with Requested and AtCapacity without
-# needing cleanup=cleanup in both classes.
+@machine.handle(ConnectionCoordinator.cleanup)
 def cleanup(self: Requested | AtCapacity):
-
     # We *don't* want to recurse in here; stopping tasks will cause
     # taskComplete!
     while self.state.performer.activeTasks:
@@ -115,11 +111,10 @@ class Initial(object):
     coord: ConnectionCoordinator
     state: ConnectionState
 
-    @machine.handle(ConnectionCoordinator.start, enter=lambda: Requested)
+    @machine.handle(ConnectionCoordinator.start)
     def start(self) -> None:
         "let's get this party started"
         self.state.getter.startGettingRequests(self.coord.requestReceived)
-
 
 TASK_LIMIT = 3
 
@@ -130,14 +125,14 @@ class Requested(object):
     state: ConnectionState
     coord: ConnectionCoordinator
 
-    @machine.handle(ConnectionCoordinator.requestReceived, enter=lambda: Requested)
+    @machine.handle(ConnectionCoordinator.requestReceived)
     def requestReceived(self, r: Request) -> None:
         print("immediately handling request", r)
         self.state.performer.performTask(r, self.coord.taskComplete)
         if len(self.state.performer.activeTasks) >= TASK_LIMIT:
             self.coord.atCapacity()
 
-    @machine.handle(ConnectionCoordinator.atCapacity, enter=lambda: AtCapacity)
+    @machine.handle(ConnectionCoordinator.atCapacity)
     def atCapacity(self) -> None:
         "at capacity; don't do anything, but enter a state"
         print("at capacity")
@@ -156,12 +151,12 @@ class AtCapacity(object):
     state: ConnectionState
     coord: ConnectionCoordinator
 
-    @machine.handle(ConnectionCoordinator.requestReceived, enter=lambda: AtCapacity)
+    @machine.handle(ConnectionCoordinator.requestReceived)
     def requestReceived(self, r: Request) -> None:
         print("buffering request", r)
         self.state.queue.append(r)
 
-    @machine.handle(ConnectionCoordinator.headroom, enter=lambda: Requested)
+    @machine.handle(ConnectionCoordinator.headroom)
     def headroom(self) -> None:
         "nothing to do, just transition to Requested state"
         unhandledRequest = self.state.queue.pop()
@@ -172,8 +167,10 @@ class AtCapacity(object):
 
 
 @machine.state()
+@dataclass
 class CleaningUp(object):
-    @machine.handle(ConnectionCoordinator.cleanup, enter=lambda: CleaningUp)
+    core: ConnectionState
+    @machine.handle(ConnectionCoordinator.cleanup)
     def noop(self) -> None:
         "we're already cleaning up don't clean up"
         print("cleanup in cleanup")
@@ -183,8 +180,18 @@ class CleaningUp(object):
         "no-op in this state"
         print("headroom in requested state")
 
+AtCapacity.requestReceived.enter(AtCapacity)
+AtCapacity.headroom.enter(Requested)
+CleaningUp.noop.enter(CleaningUp)
+Initial.start.enter(Requested)
+Requested.requestReceived.enter(Requested)
+Requested.atCapacity.enter(AtCapacity)
+
+
+
 
 ConnectionMachine = machine.buildClass()
+cleanup.enter(CleaningUp)
 
 
 def begin(r: RequestGetter, t: TaskPerformer, done: Callable[[Task], None]) -> ConnectionCoordinator:

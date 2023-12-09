@@ -22,6 +22,7 @@ from typing import (
     Tuple,
     Type,
     TypeVar,
+    Union,
     get_type_hints,
     overload,
 )
@@ -30,15 +31,16 @@ from ._core import Automaton, Transitioner
 
 
 if TYPE_CHECKING:
-    if sys.version_info >= (3, 10):
-        from typing import Concatenate, ParamSpec
+    from typing import Concatenate, ParamSpec
 
-        P = ParamSpec("P")
-        ThisInputArgs = ParamSpec("ThisInputArgs")
+    P = ParamSpec("P")
+    ThisInputArgs = ParamSpec("ThisInputArgs")
 else:
     # really just for lower python versions but it's simpler to just have it be
     # always at runtime
     P = TypeVar("P")
+    ThisInputArgs = TypeVar("ThisInputArgs")
+    Concatenate = Union
 
 
 InputsProto = TypeVar("InputsProto", covariant=True)
@@ -158,9 +160,7 @@ def _buildNewState(
     """
     k = {}
     transitionSignature = (
-        _liveSignature(transitionMethod)
-        if transitionMethod is not None
-        else None
+        _liveSignature(transitionMethod) if transitionMethod is not None else None
     )
     passedParams: Dict[str, object] = (
         {}
@@ -328,6 +328,62 @@ class ErrorState:
     __persistState__ = False
 
 
+StateCoreContra = TypeVar("StateCoreContra", contravariant=True)
+
+
+class NextStateFactory(Protocol[P, StateCoreContra]):
+    def __call__(self, core: StateCoreContra, *args: P.args, **kw: P.kwargs) -> object:
+        ...
+
+
+SelfCon = TypeVar("SelfCon", contravariant=True)
+InputsProtoInv = TypeVar("InputsProtoInv")
+InputsProtoCon = TypeVar("InputsProtoCon", contravariant=True)
+StateCoreCo = TypeVar("StateCoreCo", covariant=True)
+StateCoreCon = TypeVar("StateCoreCon", contravariant=True)
+
+
+AnyArgs = Union[
+    Callable[Concatenate[StateCore, ThisInputArgs], object],
+    Callable[Concatenate[StateCore, InputsProtoInv, ThisInputArgs], object],
+    Callable[[StateCore, InputsProtoInv], object],
+    Callable[[StateCore], object],
+    Callable[[InputsProtoInv], object],
+    Callable[[], object],
+    None,
+]
+
+
+class Handler(Protocol[InputsProtoInv, SelfCon, ThisInputArgs, R, SelfA, StateCore]):
+    __automat_handler__: tuple[
+        Callable[Concatenate[SelfA, ThisInputArgs], R],
+        Optional[AnyArgs[StateCore, ThisInputArgs, InputsProtoInv]],
+    ]
+    enter: Callable[
+        [AnyArgs[StateCore, ThisInputArgs, InputsProtoInv]],
+        None,
+    ]
+
+    def __call__(
+        notself,
+        /,
+        self: SelfCon,
+        *args: ThisInputArgs.args,
+        **kwargs: ThisInputArgs.kwargs,
+    ) -> R:
+        ...
+
+    @overload
+    def __get__(self: T, instance: None, owner: Optional[Type[object]] = None) -> T:
+        ...
+
+    @overload
+    def __get__(
+        self, instance: object, owner: Optional[Type[object]] = None
+    ) -> Callable[ThisInputArgs, R]:
+        ...
+
+
 @dataclass
 class TypicalBuilder(Generic[InputsProto, StateCore, P]):
     """
@@ -372,10 +428,10 @@ class TypicalBuilder(Generic[InputsProto, StateCore, P]):
                     if ah is None:
                         continue
                     inputMethod: Callable[..., object]
-                    enterParameter: Optional[Callable[[], Type[object]]]
+                    enterParameter: Optional[Type[object]]
                     [inputMethod, enterParameter] = ah
                     newStateType = (
-                        stateClass if enterParameter is None else enterParameter()
+                        stateClass if enterParameter is None else enterParameter
                     )
                     if sys.version_info >= (3, 9):
                         for enterAnnotation in (
@@ -457,18 +513,29 @@ class TypicalBuilder(Generic[InputsProto, StateCore, P]):
     def handle(
         self,
         input: Callable[Concatenate[SelfA, ThisInputArgs], R],
-        enter: Optional[Callable[[], Type[object]]] = None,
+        enter: Optional[AnyArgs[StateCore, ThisInputArgs, InputsProto]] = None,
     ) -> Callable[
         [Callable[Concatenate[SelfB, ThisInputArgs], R]],
-        Callable[Concatenate[SelfB, ThisInputArgs], R],
+        Handler[InputsProto, SelfB, ThisInputArgs, R, SelfA, StateCore],
     ]:
         """
         Define an input handler.
         """
 
-        def decorator(c: OutputCallable) -> OutputCallable:
-            c.__automat_handler__ = [input, enter]  # type: ignore
-            return c
+        def decorator(
+            c: OutputCallable,
+        ) -> Handler[InputsProto, SelfB, ThisInputArgs, R, SelfA, StateCore]:
+            result: Handler[InputsProto, SelfB, ThisInputArgs, R, SelfA, StateCore]
+            result = c  # type:ignore[assignment]
+            result.__automat_handler__ = (input, enter)
+
+            def doSetEnter(
+                new: AnyArgs[StateCore, ThisInputArgs, InputsProto],
+            ) -> None:
+                result.__automat_handler__ = (input, new)
+
+            result.enter = doSetEnter
+            return result
 
         return decorator
 

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Protocol
 import sys
+from dataclasses import dataclass, field
+from typing import Any, Protocol
+
 
 if sys.version_info >= (3, 9):
     from typing import Annotated
@@ -11,6 +12,13 @@ from unittest import TestCase
 
 from .._typical import TypicalBuilder
 from automat import Enter
+
+
+def requiredPreviousState(message: str) -> Any:
+    def nope() -> Any:
+        raise RuntimeError(f"noep: {message}")
+
+    return field(default_factory=nope)
 
 
 @dataclass
@@ -159,30 +167,30 @@ class FirstState(object):
         @builder.handle(SomeInputs.depcheck)
         def from_core(self, count: str) -> Annotated[str, Enter(CoreDataRequirer)]:
             return count
+
     else:
-        @builder.handle(SomeInputs.depcheck, enter=lambda: CoreDataRequirer)
+
+        @builder.handle(SomeInputs.depcheck, enter=CoreDataRequirer)
         def from_core(self, count: str) -> str:
             return count
 
-    @builder.handle(SomeInputs.next, enter=lambda: RequiresFirstState1)
+    @builder.handle(SomeInputs.next)
     def justself(self) -> tuple[object, int]:
         return (self, 0)
 
-    @builder.handle(SomeInputs.ephemeral, enter=lambda: Ephemeral)
+    @builder.handle(SomeInputs.ephemeral)
     def ephemeral(self) -> None:
         ...
 
-    @builder.handle(SomeInputs.special, enter=lambda: RequiresSpecial)
+    @builder.handle(SomeInputs.special)
     def special(self, something: SomethingSpecial) -> None:
         ...
 
-    @builder.handle(
-        SomeInputs.special_ephemeral, enter=lambda: RequiresSpecialEphemeral
-    )
+    @builder.handle(SomeInputs.special_ephemeral)
     def special_ephemeral(self, something: SomethingSpecial) -> None:
         ...
 
-    @builder.handle(SomeInputs.outside, enter=lambda: RequiresOutside)
+    @builder.handle(SomeInputs.outside)
     def outside(self) -> None:
         """
         transition to state that can respond to reveal_inputs
@@ -206,16 +214,22 @@ def use_private(
 @builder.state()
 @dataclass
 class RequiresSpecial(object):
-    something: SomethingSpecial
+    something: SomethingSpecial = requiredPreviousState("RequiresSpecial.something")
 
-    @builder.handle(SomeInputs.read_special, enter=lambda: RequiresSpecial)
+    @builder.handle(SomeInputs.read_special)
+    # can't get any of these to type-check because we can require any previous
+    # state.  maybe that's a mistake?  if you want to know about something,
+    # scribble it on the state core?
+
     def read_special(self) -> SomethingSpecial:
         return self.something
 
-    @builder.handle(SomeInputs.back, enter=lambda: FirstState)
+    @builder.handle(SomeInputs.back, enter=FirstState)
     def back(self) -> tuple[object, int]:
         return self, 7890
 
+FirstState.special.enter(RequiresSpecial)
+RequiresSpecial.read_special.enter(RequiresSpecial)
 
 @builder.state()
 @dataclass
@@ -228,40 +242,46 @@ class RequiresOutside(object):
     def reveal_inputs(self) -> SomeInputs:
         return self.machine_itself
 
+FirstState.outside.enter(RequiresOutside)
 
 @builder.state(persist=False)
 @dataclass
 class RequiresSpecialEphemeral(object):
-    something: SomethingSpecial
+    something: SomethingSpecial = requiredPreviousState("RequiresSpecialEphemeral.something")
 
-    @builder.handle(SomeInputs.read_special, enter=lambda: RequiresSpecial)
+    @builder.handle(SomeInputs.read_special, enter=RequiresSpecial)
     def read_special(self) -> SomethingSpecial:
         return self.something
 
+FirstState.special_ephemeral.enter(RequiresSpecialEphemeral)
 
 @builder.state()
 @dataclass
 class RequiresFirstState1(object):
-    other_state: FirstState
+    other_state: FirstState = requiredPreviousState("RequiresFirstState1.other_state")
 
-    @builder.handle(SomeInputs.next, enter=lambda: RequiresFirstState2)
+    @builder.handle(SomeInputs.next)
     def justrequired(self) -> tuple[object, int]:
         return (self.other_state, 1)
 
-    @builder.handle(SomeInputs.back, enter=lambda: FirstState)
+    @builder.handle(SomeInputs.back, enter=FirstState)
     def goback(self) -> tuple[object, int]:
         return (self.other_state, 1)
+
+
+FirstState.justself.enter(RequiresFirstState1)
 
 
 @builder.state()
 @dataclass
 class RequiresFirstState2(object):
-    other_state: FirstState
+    other_state: FirstState = requiredPreviousState("RequiresFirstState2.other_state")
 
     @builder.handle(SomeInputs.next)
     def justrequired(self) -> tuple[object, int]:
         return (self.other_state, 2)
 
+RequiresFirstState1.justrequired.enter(RequiresFirstState2)
 
 @builder.state()
 @dataclass
@@ -270,7 +290,7 @@ class CoreDataRequirer(object):
     I require data supplied by the state core (persistently).
     """
 
-    count: int
+    count: int = requiredPreviousState("CoreDataRequirer.count")
     shared: int = 7878
 
     @builder.handle(SomeInputs.valcheck)
@@ -281,7 +301,7 @@ class CoreDataRequirer(object):
     def getshared(self) -> int:
         return self.shared
 
-    @builder.handle(SomeInputs.back, enter=lambda: FirstState)
+    @builder.handle(SomeInputs.back, enter=FirstState)
     def back(self) -> tuple[object, int]:
         return self, 1234
 
@@ -289,16 +309,17 @@ class CoreDataRequirer(object):
 @builder.state(persist=False)
 @dataclass
 class Ephemeral:
-    count: int
+    count: int = requiredPreviousState("Ephemeral.count")
 
     @builder.handle(SomeInputs.valcheck)
     def get(self):
         return self.count
 
-    @builder.handle(SomeInputs.persistent, enter=lambda: CoreDataRequirer)
+    @builder.handle(SomeInputs.persistent, enter=CoreDataRequirer)
     def persistent(self) -> None:
         pass
 
+FirstState.ephemeral.enter(Ephemeral)
 
 C = builder.buildClass()
 
@@ -345,7 +366,7 @@ class RecoverableErrorState(object):
     Error state where we can recover.
     """
 
-    @builder1.handle(Simple.method, enter=lambda: SimpleState)
+    @builder1.handle(Simple.method, enter=SimpleState)
     def method(self) -> int:
         """
         Return a tag, then transition back to the recoverable state.
@@ -544,11 +565,11 @@ class TypicalTests(TestCase):
             builder.buildClass()
         self.assertIn("only build once", str(re.exception))
 
-
     def test_unsatisfiedDependency(self) -> None:
         """
         Unsatisfied dependencies will raise an exception in buildClass.
         """
+
         class Empty(Protocol):
             pass
 
@@ -556,10 +577,12 @@ class TypicalTests(TestCase):
             pass
 
         tmpbuild = TypicalBuilder(Empty, Core)
+
         @tmpbuild.state()
         @dataclass
         class StateWithReq:
             foo: float
+
         X = tmpbuild.buildClass()
         with self.assertRaises(RuntimeError) as re:
             X()

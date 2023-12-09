@@ -1,7 +1,9 @@
 from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Protocol, Annotated as A
-from automat import TypicalBuilder, Enter
+from typing import Annotated as A, Callable, Protocol, TypeVar, reveal_type
+
+from automat import Enter, TypicalBuilder
 
 
 class CoffeeMachine(Protocol):
@@ -20,6 +22,26 @@ class BrewerStateCore(object):
 coffee = TypicalBuilder(CoffeeMachine, BrewerStateCore)
 
 
+# if 0:
+#     what = None
+# else:
+#     what = makeMakeBeanHaver
+
+
+def makeBeanHaverMaker() -> type[BeanHaver]:
+    return BeanHaver
+
+
+T = TypeVar("T")
+
+
+def make(x: Callable[[], type[T]]) -> Callable[[], type[T]]:
+    """
+    This is a workaround for a bug in older versions of mypy.
+    """
+    return x
+
+
 @coffee.state()
 class NoBeanHaver(object):
     @coffee.handle(CoffeeMachine.brew_button)
@@ -27,8 +49,9 @@ class NoBeanHaver(object):
         print("no beans, not heating")
 
     @coffee.handle(CoffeeMachine.put_in_beans)
-    def add_beans(self, beans) -> A[None, Enter(BeanHaver)]:
+    def add_beans(self, beans: str) -> None:
         print("put in some beans", repr(beans))
+
 
 
 @coffee.state(persist=False)
@@ -46,6 +69,7 @@ class BeanHaver:
     def too_many_beans(self, beans: object) -> None:
         print("beans overflowing:", repr(beans), self.beans)
 
+NoBeanHaver.add_beans.enter(BeanHaver)
 
 CoffeeStateMachine = coffee.buildClass()
 print("Created:", CoffeeStateMachine)
