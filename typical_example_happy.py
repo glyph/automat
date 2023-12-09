@@ -86,7 +86,7 @@ class ConnectionState(object):
 machine = TypicalBuilder(ConnectionCoordinator, ConnectionState)
 
 
-@machine.implement(ConnectionCoordinator.taskComplete)
+@machine.common(ConnectionCoordinator.taskComplete)
 def taskComplete(
     c: ConnectionCoordinator, s: ConnectionState, task: Task, success: bool
 ) -> None:

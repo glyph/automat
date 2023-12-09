@@ -88,7 +88,7 @@ def _magicValueForParameter(
     passedParams: Dict[str, object],
     stateCore: object,
     existingStateCluster: Mapping[str, object],
-    inputProtocols: set[ProtocolAtRuntime[object]],
+    inputProtocols: frozenset[ProtocolAtRuntime[object]],
     syntheticSelf: _TypicalInstance[InputsProto, StateCore],
 ) -> object:
     """
@@ -161,7 +161,7 @@ def _buildNewState(
     args: Tuple[Any, ...],
     kwargs: Dict[str, object],
     existingStateCluster: Mapping[str, object],
-    inputProtocols: set[ProtocolAtRuntime[object]],
+    inputProtocols: frozenset[ProtocolAtRuntime[object]],
 ) -> Any:
     """
     Create a new state object based on the existing state cluster.
@@ -202,7 +202,7 @@ def _updateState(
     kw: Dict[str, object],
     stateFactories: Dict[str, Callable[..., UserStateType]],
     inputMethod: Callable[..., object] | None,
-    inputProtocols: set[ProtocolAtRuntime[object]],
+    inputProtocols: frozenset[ProtocolAtRuntime[object]],
 ) -> Tuple[Any, object]:
     currentState = self._transitioner._state
     stateFactory = stateFactories[currentState]
@@ -231,11 +231,15 @@ def _updateState(
 _baseMethods = set(dir(Protocol))
 
 
-def _bindableTransitionMethod(
+def _bindableInputMethod(
     inputMethod: Callable[..., object],
     stateFactories: Dict[str, Callable[..., UserStateType]],
-    inputProtocols: set[ProtocolAtRuntime[object]],
+    inputProtocols: frozenset[ProtocolAtRuntime[object]],
 ) -> Callable[..., object]:
+    """
+    Create a bindable method (i.e. "function for use at class scope") to
+    implement a I{state machine input} for the given L{_TypicalInstance}.
+    """
     inputMethodName = inputMethod.__name__
 
     @wraps(inputMethod)
@@ -252,11 +256,19 @@ def _bindableTransitionMethod(
     return method
 
 
-def _bindableDefaultMethod(
+def _bindableCommonMethod(
     inputMethod: Callable[..., object],
     impl: Callable[..., object],
     includePrivate: bool,
 ) -> Callable[..., object]:
+    """
+    Create a bindable method (i.e. "function for use at class scope") to
+    implement a I{common behavior} across all states of a given
+    L{_TypicalInstance}.  Common methods appear to callers as methods, the same
+    as transition methods which invoke state-specific behavior and may
+    transition the state machine.
+    """
+
     @wraps(inputMethod)
     def method(self: _TypicalInstance[InputsProto, StateCore], *a, **kw) -> object:
         return impl(
@@ -302,7 +314,7 @@ class _TypicalClass(
     _automaton: Automaton
     _realSyntheticType: Type[_TypicalInstance]
     _stateFactories: Dict[str, Callable[..., UserStateType]]
-    _inputProtocols: set[ProtocolAtRuntime[object]]
+    _inputProtocols: frozenset[ProtocolAtRuntime[object]]
 
     def __call__(self, *initArgs: P.args, **initKwargs: P.kwargs) -> InputsProto:
         """
@@ -449,7 +461,7 @@ class TypicalBuilder(Generic[InputsProto, StateCore, P]):
     _stateClasses: List[Type[object]] = field(default_factory=list)
     _built: bool = False
     _errorState: Type[object] = ErrorState
-    _defaultMethods: Dict[str, Tuple[Callable[..., Any], bool]] = field(
+    _commonMethods: Dict[str, Tuple[Callable[..., Any], bool]] = field(
         default_factory=dict
     )
 
@@ -463,6 +475,7 @@ class TypicalBuilder(Generic[InputsProto, StateCore, P]):
         automaton = Automaton()
         automaton.unhandledTransition(self._errorState.__name__, [None])
         stateFactories: Dict[str, Callable[..., UserStateType]] = {}
+        allProtocols = frozenset([self._stateProtocol, *self._privateProtocols])
 
         ns: Dict[str, object] = {
             "_stateFactories": stateFactories,
@@ -480,24 +493,24 @@ class TypicalBuilder(Generic[InputsProto, StateCore, P]):
                             stateName, inputName, newStateName, [outputName]
                         )
             for eachInput in possibleInputs:
-                ns[eachInput] = _bindableTransitionMethod(
+                ns[eachInput] = _bindableInputMethod(
                     getattr(eachStateProtocol, eachInput),
                     stateFactories,
-                    set([self._stateProtocol, *self._privateProtocols]),
+                    allProtocols,
                 )
 
-        # default methods are really only supposed to work for the main /
-        # public interface, since the only reason to have them is public-facing.
-        defaultMethods = {
-            defaultMethodName: _bindableDefaultMethod(
-                getattr(self._stateProtocol, defaultMethodName),
-                defaultImpl,
+        # common methods are really only supposed to work for the main / public
+        # interface, since the only reason to have them is public-facing.
+        commonMethods = {
+            commonMethodName: _bindableCommonMethod(
+                getattr(self._stateProtocol, commonMethodName),
+                commonImpl,
                 includePrivate,
             )
-            for defaultMethodName, (
-                defaultImpl,
+            for commonMethodName, (
+                commonImpl,
                 includePrivate,
-            ) in self._defaultMethods.items()
+            ) in self._commonMethods.items()
         }
         return _TypicalClass(
             self._buildCore,
@@ -508,11 +521,11 @@ class TypicalBuilder(Generic[InputsProto, StateCore, P]):
                 tuple([_TypicalInstance]),
                 {
                     **ns,
-                    **defaultMethods,
+                    **commonMethods,
                 },
             ),
             stateFactories,
-            set([self._stateProtocol, *self._privateProtocols]),
+            allProtocols,
         )
 
     def state(self, *, persist=True, error=False) -> Callable[[Type[T]], Type[T]]:
@@ -563,7 +576,7 @@ class TypicalBuilder(Generic[InputsProto, StateCore, P]):
         return decorator
 
     @overload
-    def implement(
+    def common(
         self,
         input: Callable[Concatenate[SelfA, ThisInputArgs], R],
     ) -> Callable[
@@ -573,7 +586,7 @@ class TypicalBuilder(Generic[InputsProto, StateCore, P]):
         ...
 
     @overload
-    def implement(
+    def common(
         self,
         input: Callable[Concatenate[SelfA, ThisInputArgs], R],
         privateType: ProtocolAtRuntime[PrivateProto],
@@ -583,7 +596,7 @@ class TypicalBuilder(Generic[InputsProto, StateCore, P]):
     ]:
         ...
 
-    def implement(
+    def common(
         self,
         input: Callable[Concatenate[SelfA, ThisInputArgs], R],
         privateType: ProtocolAtRuntime[PrivateProto] | None = None,
@@ -610,7 +623,7 @@ class TypicalBuilder(Generic[InputsProto, StateCore, P]):
             self._privateProtocols.add(privateType)
 
         def decorator(f: OutputCallable) -> OutputCallable:
-            self._defaultMethods[input.__name__] = (f, privateType is not None)
+            self._commonMethods[input.__name__] = (f, privateType is not None)
             return f
 
         return decorator

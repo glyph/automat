@@ -134,7 +134,7 @@ builder = TypicalBuilder(SomeInputs, StateCore)
 # .handle()
 
 
-@builder.implement(SomeInputs.in_every_state)
+@builder.common(SomeInputs.in_every_state)
 def everystate(
     public_interface: SomeInputs, state_core: StateCore, fixture: TestCase
 ) -> int:
@@ -204,7 +204,7 @@ class FirstState(object):
         return 3333
 
 
-@builder.implement(SomeInputs.use_private, PrivateInputs)
+@builder.common(SomeInputs.use_private, PrivateInputs)
 def use_private(
     public: SomeInputs, core: StateCore, private: PrivateInputs
 ) -> PrivateInputs:
