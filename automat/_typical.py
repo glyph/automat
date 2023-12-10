@@ -139,6 +139,17 @@ def _getCore(
     return stateCore
 
 
+def _getCoreAttribute(attr: str) -> ValueBuilder:
+    def _coreGetter(
+        syntheticSelf: _TypicalInstance[InputsProto, StateCore],
+        stateCore: object,
+        existingStateCluster: Mapping[str, object],
+    ) -> object:
+        return getattr(stateCore, attr)
+
+    return _coreGetter
+
+
 def _getSynthSelf(
     syntheticSelf: _TypicalInstance[InputsProto, StateCore],
     stateCore: object,
@@ -148,9 +159,12 @@ def _getSynthSelf(
 
 
 def _stateBuilder(
+    inputSignature: Signature,
     stateFactory: Callable[..., Any],
     suppliers: list[tuple[str, ValueBuilder]] = [],
 ):
+    print("suppliers", stateFactory, suppliers)
+
     def _(
         syntheticSelf: _TypicalInstance[InputsProto, StateCore],
         stateCore: object,
@@ -159,20 +173,23 @@ def _stateBuilder(
         kwargs: Dict[str, object],
     ) -> object:
         toPass: Dict[str, object] = {}
-        toPass.update(kwargs)  # here's where we get the transition-supplied
+        print("sig", str(inputSignature.parameters))
+        print("a, kw", args, kwargs)
+        toPass.update(
+            inputSignature.bind(object(), *args, **kwargs).arguments
+        )  # here's where we get the transition-supplied arguments
+        # hmmmm
+        toPass.pop("self")
         # parameters
-        return stateFactory(
-            **toPass,
-            **{
-                extraParamName: extraParamFactory(
-                    syntheticSelf, stateCore, existingStateCluster
-                )
-                for (extraParamName, extraParamFactory) in suppliers
-            },
-        )
-
-    setattr(_, "__persistState__", getattr(stateFactory, "__persistState__", True))
-
+        computedParams = {
+            extraParamName: extraParamFactory(
+                syntheticSelf, stateCore, existingStateCluster
+            )
+            for (extraParamName, extraParamFactory) in suppliers
+        }
+        print("toPass", toPass, "computedParams", computedParams)
+        toPass.update(computedParams)
+        return stateFactory(**toPass)
     return _
 
 
@@ -195,7 +212,7 @@ def _buildStateBuilder(
     transitionSignature = (
         _liveSignature(transitionMethod)
         if transitionMethod is not None
-        else Signature()
+        else Signature([Parameter("self", Parameter.POSITIONAL_OR_KEYWORD)])
     )
     factorySignature = _liveSignature(stateFactory)
 
@@ -205,9 +222,20 @@ def _buildStateBuilder(
     # attributes won't be pulled from the state core, etc)
 
     def _valueSuppliers() -> Iterable[tuple[str, ValueBuilder]]:
-        for notSuppliedByTransitionName in set(factorySignature.parameters) - set(
-            transitionSignature.parameters
-        ):
+        factoryNeeds = set(factorySignature.parameters)
+        transitionSupplies = set(transitionSignature.parameters)
+        print("for:", stateFactory)
+        print("upon:", transitionMethod)
+        print("needs:", factoryNeeds)
+        print("supplies:", transitionSupplies)
+        notSuppliedParams = factoryNeeds - transitionSupplies
+        print("not supplied:", stateCoreType, notSuppliedParams)
+        # bug: even if it *is* supplied by the transition, the type must match as well.
+        for maybeTypeMismatch in factoryNeeds & transitionSupplies:
+            if transitionSignature.parameters[maybeTypeMismatch].annotation != factorySignature.parameters[maybeTypeMismatch].annotation:
+                if factorySignature.parameters[maybeTypeMismatch].default == Parameter.empty:
+                    notSuppliedParams.add(maybeTypeMismatch)
+        for notSuppliedByTransitionName in notSuppliedParams:
             # These are the parameters we will need to supply.
             notSuppliedByTransition = factorySignature.parameters[
                 notSuppliedByTransitionName
@@ -220,12 +248,20 @@ def _buildStateBuilder(
                         _getOtherState(parameterType.__name__),
                     )
                 )
-            if parameterType is stateCoreType:
+            elif parameterType is stateCoreType:
                 yield ((notSuppliedByTransitionName, _getCore))
-            if parameterType in inputProtocols:
+            elif parameterType in inputProtocols:
                 yield ((notSuppliedByTransitionName, _getSynthSelf))
+            else:
+                yield (
+                    (
+                        notSuppliedByTransitionName,
+                        _getCoreAttribute(notSuppliedByTransitionName),
+                    )
+                )
 
-    return _stateBuilder(stateFactory, list(_valueSuppliers()))
+    print("building", transitionMethod, transitionSignature)
+    return _stateBuilder(transitionSignature, stateFactory, list(_valueSuppliers()))
 
 
 _baseMethods = set(dir(Protocol))
@@ -243,21 +279,31 @@ def _bindableInputMethod(
 
     @wraps(inputMethod)
     def method(self: _TypicalInstance[InputsProto, StateCore], *a, **kw) -> object:
-        oldState = self._transitioner._state
-        stateObject = self._stateCluster[oldState]
+        oldStateName = self._transitioner._state
+        oldStateObject = self._stateCluster[oldStateName]
         [[outputMethodName], tracer] = self._transitioner.transition(inputMethodName)
-        newState = self._transitioner._state
+        newStateName = self._transitioner._state
+        print(f"transition! {oldStateObject}")
+        print(
+            f"{oldStateName}.{inputMethodName}() [.{outputMethodName}()] => {newStateName}"
+        )
         # _updateState(self, oldState, a, kw, stateBuilders, inputMethod, inputProtocols)
         # here we need to invoke the output method
         if outputMethodName is None:
-            raise RuntimeError(f"unhandled: state:{oldState} input:{inputMethodName}")
-        realMethod = getattr(stateObject, outputMethodName)
+            raise RuntimeError(
+                f"unhandled: state:{oldStateName} input:{inputMethodName}"
+            )
+        realMethod = getattr(oldStateObject, outputMethodName)
         stateBuilder: StateBuilder = realMethod.__stateBuilder__
-        if newState not in self._stateCluster:
-            self._stateCluster[newState] = stateBuilder(
+        if newStateName not in self._stateCluster:
+            newBuilt = self._stateCluster[newStateName] = stateBuilder(
                 self, self._stateCore, self._stateCluster, a, kw
             )
-        return realMethod(*a, **kw)
+            print(f"built new state: {newBuilt}")
+        result = realMethod(*a, **kw)
+        if newStateName != oldStateName and not oldStateObject.__persistState__:  # type:ignore[attr-defined]
+            del self._stateCluster[oldStateName]
+        return result
 
     return method
 
@@ -320,6 +366,7 @@ class _TypicalClass(
     _automaton: Automaton
     _realSyntheticType: Type[_TypicalInstance]
     _inputProtocols: frozenset[ProtocolAtRuntime[object]]
+    _initialStateBuilder: StateBuilder
 
     def __call__(self, *initArgs: P.args, **initKwargs: P.kwargs) -> InputsProto:
         """
@@ -327,10 +374,12 @@ class _TypicalClass(
         something that appears to be an L{InputsProto}.
         """
         result = self._realSyntheticType(
-            self._buildCore(*initArgs, **initKwargs),
+            stateCore := self._buildCore(*initArgs, **initKwargs),
             Transitioner(self._automaton, self._initialState.__name__),
         )
-        result._stateCluster[result._transitioner._state] = self._initialState()
+        result._stateCluster[result._transitioner._state] = self._initialStateBuilder(
+            result, stateCore, result._stateCluster, initArgs, initKwargs
+        )
         return result  # type: ignore
 
     def __instancecheck__(self, other: object) -> bool:
@@ -409,7 +458,9 @@ class Handler(Protocol[InputsProtoInv, SelfCon, ThisInputArgs, R, SelfA, StateCo
 AnyHandler = Handler[object, object, ..., object, object, object]
 
 
-def _stateOutputs(stateClass: type[object]) -> Iterable[tuple[str, str, str]]:
+def _stateOutputs(
+    stateClass: type[object],
+) -> Iterable[tuple[str, str, str, Callable[..., object]]]:
     """
     Extract all input-handling methods from a given state class, returning a
     3-tuple of:
@@ -447,7 +498,7 @@ def _stateOutputs(stateClass: type[object]) -> Iterable[tuple[str, str, str]]:
                 if isinstance(each, Enter)
             ):
                 newStateFactory = enterAnnotation.state
-        yield outputMethodName, inputMethod.__name__, newStateFactory.__name__
+        yield outputMethodName, inputMethod.__name__, newStateFactory.__name__, newStateFactory
 
 
 METADATA_DETRITUS = frozenset(["__dict__", "__weakref__", *dir(Protocol)])
@@ -499,12 +550,19 @@ class TypicalBuilder(Generic[InputsProto, StateCore, P]):
             for stateClass in [*self._stateClasses, self._errorState]:
                 stateName = stateClass.__name__
                 stateFactories[stateName] = stateClass
-                for (outputName, inputName, newStateName) in _stateOutputs(stateClass):
+                for (
+                    outputName,
+                    inputName,
+                    newStateName,
+                    newStateFactory,
+                ) in _stateOutputs(stateClass):
                     output = getattr(stateClass, outputName)
-                    buildAfterFactories.append((output, stateCoreType, stateClass))
                     if inputName in possibleInputs:
                         automaton.addTransition(
                             stateName, inputName, newStateName, [outputName]
+                        )
+                        buildAfterFactories.append(
+                            (output, stateCoreType, stateClass, newStateFactory)
                         )
             for eachInput in possibleInputs:
                 ns[eachInput] = _bindableInputMethod(
@@ -513,10 +571,19 @@ class TypicalBuilder(Generic[InputsProto, StateCore, P]):
                 )
         # stateFactories is built, now time to build the builders
 
-        for output, stateCoreType, stateClass in buildAfterFactories:
+        for (
+            output,
+            stateCoreType,
+            stateClassName,
+            newStateFactory,
+        ) in buildAfterFactories:
+            print("buildAfter", output, stateCoreType, stateClassName)
+            assert (
+                getattr(output, "__stateBuilder__", None) is None
+            ), "duplicate state builder"
             output.__stateBuilder__ = _buildStateBuilder(
                 stateCoreType,
-                stateClass,
+                newStateFactory,
                 stateFactories,
                 output,
                 allProtocols,
@@ -535,6 +602,13 @@ class TypicalBuilder(Generic[InputsProto, StateCore, P]):
                 includePrivate,
             ) in self._commonMethods.items()
         }
+        initialStateBuilder = _buildStateBuilder(
+            stateCoreType,
+            self._stateClasses[0],
+            stateFactories,
+            None,
+            allProtocols,
+        )
         return _TypicalClass(
             self._buildCore,
             self._stateClasses[0],
@@ -548,6 +622,7 @@ class TypicalBuilder(Generic[InputsProto, StateCore, P]):
                 },
             ),
             allProtocols,
+            initialStateBuilder,
         )
 
     def state(self, *, persist=True, error=False) -> Callable[[Type[T]], Type[T]]:
@@ -587,9 +662,7 @@ class TypicalBuilder(Generic[InputsProto, StateCore, P]):
             result = c  # type:ignore[assignment]
             result.__automat_handler__ = (input, enter)
 
-            def doSetEnter(
-                new: AnyArgs[StateCore, ThisInputArgs, InputsProto],
-            ) -> None:
+            def doSetEnter(new: AnyArgs[StateCore, ThisInputArgs, InputsProto]) -> None:
                 result.__automat_handler__ = (input, new)
 
             result.enter = doSetEnter

@@ -247,7 +247,7 @@ FirstState.outside.enter(RequiresOutside)
 @builder.state(persist=False)
 @dataclass
 class RequiresSpecialEphemeral(object):
-    something: SomethingSpecial = requiredPreviousState("RequiresSpecialEphemeral.something")
+    something: SomethingSpecial# = requiredPreviousState("RequiresSpecialEphemeral.something")
 
     @builder.handle(SomeInputs.read_special, enter=RequiresSpecial)
     def read_special(self) -> SomethingSpecial:
@@ -258,7 +258,7 @@ FirstState.special_ephemeral.enter(RequiresSpecialEphemeral)
 @builder.state()
 @dataclass
 class RequiresFirstState1(object):
-    other_state: FirstState = requiredPreviousState("RequiresFirstState1.other_state")
+    other_state: FirstState# = requiredPreviousState("RequiresFirstState1.other_state")
 
     @builder.handle(SomeInputs.next)
     def justrequired(self) -> tuple[object, int]:
@@ -275,7 +275,7 @@ FirstState.justself.enter(RequiresFirstState1)
 @builder.state()
 @dataclass
 class RequiresFirstState2(object):
-    other_state: FirstState = requiredPreviousState("RequiresFirstState2.other_state")
+    other_state: FirstState# = requiredPreviousState("RequiresFirstState2.other_state")
 
     @builder.handle(SomeInputs.next)
     def justrequired(self) -> tuple[object, int]:
@@ -290,7 +290,7 @@ class CoreDataRequirer(object):
     I require data supplied by the state core (persistently).
     """
 
-    count: int = requiredPreviousState("CoreDataRequirer.count")
+    count: int# = requiredPreviousState("CoreDataRequirer.count")
     shared: int = 7878
 
     @builder.handle(SomeInputs.valcheck)
@@ -309,7 +309,7 @@ class CoreDataRequirer(object):
 @builder.state(persist=False)
 @dataclass
 class Ephemeral:
-    count: int = requiredPreviousState("Ephemeral.count")
+    count: int# = requiredPreviousState("Ephemeral.count")
 
     @builder.handle(SomeInputs.valcheck)
     def get(self):
@@ -319,7 +319,9 @@ class Ephemeral:
     def persistent(self) -> None:
         pass
 
+print('setting FirstState.ephemeral to enter')
 FirstState.ephemeral.enter(Ephemeral)
+print("i set it")
 
 C = builder.buildClass()
 
@@ -584,6 +586,6 @@ class TypicalTests(TestCase):
             foo: float
 
         X = tmpbuild.buildClass()
-        with self.assertRaises(RuntimeError) as re:
+        with self.assertRaises(AttributeError) as re:
             X()
-        self.assertIn("parameter foo", str(re.exception))
+        self.assertIn("has no attribute 'foo'", str(re.exception))
