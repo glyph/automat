@@ -14,13 +14,6 @@ from .._typical import TypicalBuilder
 from automat import Enter
 
 
-def requiredPreviousState(message: str) -> Any:
-    def nope() -> Any:
-        raise RuntimeError(f"noep: {message}")
-
-    return field(default_factory=nope)
-
-
 @dataclass
 class SomethingSpecial(object):
     """
@@ -214,7 +207,7 @@ def use_private(
 @builder.state()
 @dataclass
 class RequiresSpecial(object):
-    something: SomethingSpecial = requiredPreviousState("RequiresSpecial.something")
+    something: SomethingSpecial
 
     @builder.handle(SomeInputs.read_special)
     # can't get any of these to type-check because we can require any previous
@@ -247,7 +240,7 @@ FirstState.outside.enter(RequiresOutside)
 @builder.state(persist=False)
 @dataclass
 class RequiresSpecialEphemeral(object):
-    something: SomethingSpecial# = requiredPreviousState("RequiresSpecialEphemeral.something")
+    something: SomethingSpecial
 
     @builder.handle(SomeInputs.read_special, enter=RequiresSpecial)
     def read_special(self) -> SomethingSpecial:
@@ -258,7 +251,7 @@ FirstState.special_ephemeral.enter(RequiresSpecialEphemeral)
 @builder.state()
 @dataclass
 class RequiresFirstState1(object):
-    other_state: FirstState# = requiredPreviousState("RequiresFirstState1.other_state")
+    other_state: FirstState
 
     @builder.handle(SomeInputs.next)
     def justrequired(self) -> tuple[object, int]:
@@ -275,7 +268,7 @@ FirstState.justself.enter(RequiresFirstState1)
 @builder.state()
 @dataclass
 class RequiresFirstState2(object):
-    other_state: FirstState# = requiredPreviousState("RequiresFirstState2.other_state")
+    other_state: FirstState
 
     @builder.handle(SomeInputs.next)
     def justrequired(self) -> tuple[object, int]:
@@ -290,7 +283,7 @@ class CoreDataRequirer(object):
     I require data supplied by the state core (persistently).
     """
 
-    count: int# = requiredPreviousState("CoreDataRequirer.count")
+    count: int
     shared: int = 7878
 
     @builder.handle(SomeInputs.valcheck)
@@ -309,7 +302,7 @@ class CoreDataRequirer(object):
 @builder.state(persist=False)
 @dataclass
 class Ephemeral:
-    count: int# = requiredPreviousState("Ephemeral.count")
+    count: int
 
     @builder.handle(SomeInputs.valcheck)
     def get(self):
@@ -413,7 +406,7 @@ class TypicalTests(TestCase):
         i.depcheck("ignore")
         default = i.valcheck2()
         self.assertEqual(i.valcheck(), 2)
-        self.assertEqual(default, 7878)
+        self.assertEqual(default, 10)
 
     def test_default_implementation(self) -> None:
         """

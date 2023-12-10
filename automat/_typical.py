@@ -270,6 +270,7 @@ _baseMethods = set(dir(Protocol))
 def _bindableInputMethod(
     inputMethod: Callable[..., object],
     inputProtocols: frozenset[ProtocolAtRuntime[object]],
+    errorState: Callable[..., object],
 ) -> Callable[..., object]:
     """
     Create a bindable method (i.e. "function for use at class scope") to
@@ -287,9 +288,9 @@ def _bindableInputMethod(
         print(
             f"{oldStateName}.{inputMethodName}() [.{outputMethodName}()] => {newStateName}"
         )
-        # _updateState(self, oldState, a, kw, stateBuilders, inputMethod, inputProtocols)
         # here we need to invoke the output method
         if outputMethodName is None:
+            self._stateCluster[newStateName] = errorState()
             raise RuntimeError(
                 f"unhandled: state:{oldStateName} input:{inputMethodName}"
             )
@@ -568,6 +569,7 @@ class TypicalBuilder(Generic[InputsProto, StateCore, P]):
                 ns[eachInput] = _bindableInputMethod(
                     getattr(eachStateProtocol, eachInput),
                     allProtocols,
+                    self._errorState,
                 )
         # stateFactories is built, now time to build the builders
 
