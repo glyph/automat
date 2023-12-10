@@ -312,9 +312,7 @@ class Ephemeral:
     def persistent(self) -> None:
         pass
 
-print('setting FirstState.ephemeral to enter')
 FirstState.ephemeral.enter(Ephemeral)
-print("i set it")
 
 C = builder.buildClass()
 
