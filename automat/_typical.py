@@ -167,9 +167,12 @@ def _getSynthSelf(
 
 def _stateBuilder(
     inputSignature: Signature,
+    factorySignature: Signature,
     stateFactory: Callable[..., Any],
     suppliers: list[tuple[str, ValueBuilder]] = [],
 ):
+    wanted = frozenset(factorySignature.parameters)
+
     def _(
         syntheticSelf: _TypicalInstance[InputsProto, StateCore],
         stateCore: object,
@@ -177,21 +180,14 @@ def _stateBuilder(
         args: Tuple[object, ...],
         kwargs: Dict[str, object],
     ) -> object:
-        toPass: Dict[str, object] = {}
-        toPass.update(
-            inputSignature.bind(object(), *args, **kwargs).arguments
-        )  # here's where we get the transition-supplied arguments
-        # hmmmm
-        toPass.pop("self")
-        # parameters
-        computedParams = {
-            extraParamName: extraParamFactory(
+        boundArgs = inputSignature.bind(*args, **kwargs).arguments
+        for unwanted in frozenset(boundArgs) - wanted:
+            del boundArgs[unwanted]
+        for (extraParamName, extraParamFactory) in suppliers:
+            boundArgs[extraParamName] = extraParamFactory(
                 syntheticSelf, stateCore, existingStateCluster
             )
-            for (extraParamName, extraParamFactory) in suppliers
-        }
-        toPass.update(computedParams)
-        return stateFactory(**toPass)
+        return stateFactory(**boundArgs)
 
     return _
 
@@ -270,6 +266,9 @@ def _buildStateBuilder(
         if transitionMethod is not None
         else Signature([Parameter("self", Parameter.POSITIONAL_OR_KEYWORD)])
     )
+    skipped = iter(transitionSignature.parameters.values())
+    next(skipped)
+    transitionSignature = transitionSignature.replace(parameters=list(skipped))
     factorySignature = _liveSignature(stateFactory)
 
     # All the parameters that the transition expects MUST be supplied by the
@@ -286,7 +285,7 @@ def _buildStateBuilder(
             inputProtocols,
         )
     )
-    return _stateBuilder(transitionSignature, stateFactory, suppliers)
+    return _stateBuilder(transitionSignature, factorySignature, stateFactory, suppliers)
 
 
 _baseMethods = set(dir(Protocol))
@@ -323,8 +322,9 @@ def _bindableInputMethod(
             )
         result = realMethod(*a, **kw)
         if (
-            newStateName != oldStateName and not oldStateObject.__persistState__
-        ):  # type:ignore[attr-defined]
+            newStateName != oldStateName
+            and not oldStateObject.__persistState__  # type:ignore[attr-defined]
+        ):
             del self._stateCluster[oldStateName]
         return result
 
@@ -339,9 +339,11 @@ def _bindableCommonMethod(
     """
     Create a bindable method (i.e. "function for use at class scope") to
     implement a I{common behavior} across all states of a given
-    L{_TypicalInstance}.  Common methods appear to callers as methods, the same
-    as transition methods which invoke state-specific behavior and may
-    transition the state machine.
+    L{_TypicalInstance}.  Common methods appear to callers as methods.
+
+    However, unlike transition methods which invoke state-specific behavior and
+    may transition the state machine, common methods are just like regular
+    methods you might define on a class, that are defined on the *outer* state machine.
     """
 
     @wraps(inputMethod)
@@ -601,9 +603,6 @@ class TypicalBuilder(Generic[InputsProto, StateCore, P]):
             stateClassName,
             newStateFactory,
         ) in buildAfterFactories:
-            assert (
-                getattr(output, "__stateBuilder__", None) is None
-            ), "duplicate state builder"
             output.__stateBuilder__ = _buildStateBuilder(
                 stateCoreType,
                 newStateFactory,
@@ -625,11 +624,13 @@ class TypicalBuilder(Generic[InputsProto, StateCore, P]):
                 includePrivate,
             ) in self._commonMethods.items()
         }
+        # initial state builder has to take the arguments for the state core's
+        # constructor.
         initialStateBuilder = _buildStateBuilder(
             stateCoreType,
             self._stateClasses[0],
             stateFactories,
-            None,
+            stateCoreType.__init__,
             allProtocols,
         )
         return _TypicalClass(

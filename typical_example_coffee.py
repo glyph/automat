@@ -73,8 +73,9 @@ NoBeanHaver.add_beans.enter(BeanHaver)
 
 CoffeeStateMachine = coffee.buildClass()
 print("Created:", CoffeeStateMachine)
+# pass initial heat of 3 to BrewerStateCore
 x: CoffeeMachine = CoffeeStateMachine(3)
-print(isinstance(x, CoffeeStateMachine))
+print(x)
 x.brew_button()
 x.brew_button()
 x.put_in_beans("old beans")
