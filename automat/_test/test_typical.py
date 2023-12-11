@@ -3,6 +3,8 @@ from __future__ import annotations
 import sys
 from dataclasses import dataclass, field
 from typing import Any, Protocol
+class ModuleEmpty(Protocol):
+    pass
 
 
 if sys.version_info >= (3, 9):
@@ -162,8 +164,7 @@ class FirstState(object):
             return count
 
     else:
-
-        @builder.handle(SomeInputs.depcheck, enter=CoreDataRequirer)
+        @builder.handle(SomeInputs.depcheck)
         def from_core(self, count: str) -> str:
             return count
 
@@ -306,6 +307,8 @@ class CoreDataRequirer(object):
     def back(self) -> tuple[object, int]:
         return self, 1234
 
+if sys.version_info < (3, 9):
+    FirstState.from_core.enter(CoreDataRequirer)
 
 @builder.state(persist=False)
 @dataclass

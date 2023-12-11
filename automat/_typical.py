@@ -30,20 +30,11 @@ from typing import (
 
 from ._core import Automaton, Transitioner
 
-
-if TYPE_CHECKING:
-    from typing import Concatenate, ParamSpec
-
-    P = ParamSpec("P")
-    ThisInputArgs = ParamSpec("ThisInputArgs")
-else:
-    # really just for lower python versions but it's simpler to just have it be
-    # always at runtime
-    P = TypeVar("P")
-    ThisInputArgs = TypeVar("ThisInputArgs")
-    Concatenate = Union
-
-
+SelfCon = TypeVar("SelfCon", contravariant=True)
+InputsProtoInv = TypeVar("InputsProtoInv")
+InputsProtoCon = TypeVar("InputsProtoCon", contravariant=True)
+StateCoreCo = TypeVar("StateCoreCo", covariant=True)
+StateCoreCon = TypeVar("StateCoreCon", contravariant=True)
 InputsProto = TypeVar("InputsProto", covariant=True)
 PrivateProto = TypeVar("PrivateProto", covariant=True)
 UserStateType = object
@@ -54,6 +45,36 @@ SelfB = TypeVar("SelfB")
 R = TypeVar("R")
 T = TypeVar("T")
 OutputCallable = TypeVar("OutputCallable", bound=Callable[..., Any])
+
+
+if TYPE_CHECKING:
+    from typing import Concatenate, ParamSpec
+
+    P = ParamSpec("P")
+    ThisInputArgs = ParamSpec("ThisInputArgs")
+    AnyArgs = Union[
+        Callable[Concatenate[StateCore, ThisInputArgs], object],
+        Callable[Concatenate[StateCore, InputsProtoInv, ThisInputArgs], object],
+        Callable[[StateCore, InputsProtoInv], object],
+        Callable[[StateCore], object],
+        Callable[[InputsProtoInv], object],
+        Callable[[], object],
+        None,
+    ]
+    whatever = ...
+else:
+    # really just for lower python versions but it's simpler to just have it be
+    # always at runtime
+    P = TypeVar("P")
+    ThisInputArgs = TypeVar("ThisInputArgs")
+    AnyArgs = object
+    whatever = object
+
+    class Concatenater:
+        def __getitem__(self, *a):
+            return list(a)
+
+    Concatenate = Concatenater()
 
 
 @dataclass
@@ -432,24 +453,6 @@ class NextStateFactory(Protocol[P, StateCoreContra]):
         ...
 
 
-SelfCon = TypeVar("SelfCon", contravariant=True)
-InputsProtoInv = TypeVar("InputsProtoInv")
-InputsProtoCon = TypeVar("InputsProtoCon", contravariant=True)
-StateCoreCo = TypeVar("StateCoreCo", covariant=True)
-StateCoreCon = TypeVar("StateCoreCon", contravariant=True)
-
-
-AnyArgs = Union[
-    Callable[Concatenate[StateCore, ThisInputArgs], object],
-    Callable[Concatenate[StateCore, InputsProtoInv, ThisInputArgs], object],
-    Callable[[StateCore, InputsProtoInv], object],
-    Callable[[StateCore], object],
-    Callable[[InputsProtoInv], object],
-    Callable[[], object],
-    None,
-]
-
-
 class Handler(Protocol[InputsProtoInv, SelfCon, ThisInputArgs, R, SelfA, StateCore]):
     __automat_handler__: tuple[
         Callable[Concatenate[SelfA, ThisInputArgs], R],
@@ -480,7 +483,10 @@ class Handler(Protocol[InputsProtoInv, SelfCon, ThisInputArgs, R, SelfA, StateCo
         ...
 
 
-AnyHandler = Handler[object, object, ..., object, object, object]
+if TYPE_CHECKING:
+    AnyHandler = Handler[object, object, ..., object, object, object]
+else:
+    AnyHandler = Handler[object, object, object, object, object, object]
 
 
 def _stateOutputs(
@@ -502,8 +508,8 @@ def _stateOutputs(
            has been handled by the aforementioned state output method.
     """
     for outputMethodName in dir(stateClass):
-        maybeOutputMethod = getattr(stateClass, outputMethodName)
-        if not hasattr(maybeOutputMethod, "__automat_handler__"):
+        maybeOutputMethod = getattr(stateClass, outputMethodName, None)
+        if maybeOutputMethod is None or not hasattr(maybeOutputMethod, "__automat_handler__"):
             continue
         outputMethod: AnyHandler = maybeOutputMethod
         [inputMethod, enterParameter] = outputMethod.__automat_handler__
@@ -526,7 +532,25 @@ def _stateOutputs(
         yield outputMethodName, inputMethod.__name__, newStateFactory.__name__, newStateFactory
 
 
-METADATA_DETRITUS = frozenset(["__dict__", "__weakref__", *dir(Protocol)])
+class _SampleProtocol(Protocol):
+    pass
+
+from inspect import getmembers, isfunction
+
+emptyProtocolMethods = frozenset(name for name, each in getmembers(_SampleProtocol, isfunction))
+
+def actuallyDefinedProtocolMethods(protocol: object) -> frozenset[str]:
+    """
+    Attempt to ignore implementation details, and get all the methods that the
+    protocol actually defines.
+
+    that includes locally defined methods and also those defined in inherited
+    superclasses.
+    """
+    return frozenset(name for name, each in getmembers(protocol, isfunction)) - emptyProtocolMethods
+
+
+
 """
 The process of defining a Protocol, or any Python class really, leaves behind
 some extra junk which we cannot consider state-machine input methods.
@@ -571,7 +595,7 @@ class TypicalBuilder(Generic[InputsProto, StateCore, P]):
         }
         buildAfterFactories = []
         for eachStateProtocol in [self._stateProtocol, *self._privateProtocols]:
-            possibleInputs = frozenset(dir(eachStateProtocol)) - METADATA_DETRITUS
+            possibleInputs = actuallyDefinedProtocolMethods(eachStateProtocol)
             for stateClass in [*self._stateClasses, self._errorState]:
                 stateName = stateClass.__name__
                 stateFactories[stateName] = stateClass
