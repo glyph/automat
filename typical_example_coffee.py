@@ -53,7 +53,6 @@ class NoBeanHaver(object):
         print("put in some beans", repr(beans))
 
 
-
 @coffee.state(persist=False)
 @dataclass
 class BeanHaver:
@@ -68,6 +67,7 @@ class BeanHaver:
     @coffee.handle(CoffeeMachine.put_in_beans)
     def too_many_beans(self, beans: object) -> None:
         print("beans overflowing:", repr(beans), self.beans)
+
 
 NoBeanHaver.add_beans.enter(BeanHaver)
 

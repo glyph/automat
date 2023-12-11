@@ -116,6 +116,7 @@ class Initial(object):
         "let's get this party started"
         self.state.getter.startGettingRequests(self.coord.requestReceived)
 
+
 TASK_LIMIT = 3
 
 
@@ -170,6 +171,7 @@ class AtCapacity(object):
 @dataclass
 class CleaningUp(object):
     core: ConnectionState
+
     @machine.handle(ConnectionCoordinator.cleanup)
     def noop(self) -> None:
         "we're already cleaning up don't clean up"
@@ -180,6 +182,7 @@ class CleaningUp(object):
         "no-op in this state"
         print("headroom in requested state")
 
+
 AtCapacity.requestReceived.enter(AtCapacity)
 AtCapacity.headroom.enter(Requested)
 CleaningUp.noop.enter(CleaningUp)
@@ -188,13 +191,13 @@ Requested.requestReceived.enter(Requested)
 Requested.atCapacity.enter(AtCapacity)
 
 
-
-
 ConnectionMachine = machine.buildClass()
 cleanup.enter(CleaningUp)
 
 
-def begin(r: RequestGetter, t: TaskPerformer, done: Callable[[Task], None]) -> ConnectionCoordinator:
+def begin(
+    r: RequestGetter, t: TaskPerformer, done: Callable[[Task], None]
+) -> ConnectionCoordinator:
     machine = ConnectionMachine(r, t, done)
     machine.start()
     return machine
