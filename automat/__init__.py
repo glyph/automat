@@ -4,8 +4,8 @@ from ._core import NoTransition
 from ._typical import TypicalBuilder, Enter
 
 __all__ = [
-    'MethodicalMachine',
-    'TypicalMachine',
-    'NoTransition',
-    'Enter',
+    "MethodicalMachine",
+    "TypicalMachine",
+    "NoTransition",
+    "Enter",
 ]

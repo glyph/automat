@@ -85,7 +85,6 @@ class Automaton(object):
     def unhandledTransition(self, outState, outputSymbols):
         self._unhandledTransition = (outState, outputSymbols)
 
-
     def allTransitions(self):
         """
         All transitions.

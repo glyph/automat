@@ -221,8 +221,10 @@ class RequiresSpecial(object):
     def back(self) -> tuple[object, int]:
         return self, 7890
 
+
 FirstState.special.enter(RequiresSpecial)
 RequiresSpecial.read_special.enter(RequiresSpecial)
+
 
 @builder.state()
 @dataclass
@@ -235,7 +237,9 @@ class RequiresOutside(object):
     def reveal_inputs(self) -> SomeInputs:
         return self.machine_itself
 
+
 FirstState.outside.enter(RequiresOutside)
+
 
 @builder.state(persist=False)
 @dataclass
@@ -246,7 +250,9 @@ class RequiresSpecialEphemeral(object):
     def read_special(self) -> SomethingSpecial:
         return self.something
 
+
 FirstState.special_ephemeral.enter(RequiresSpecialEphemeral)
+
 
 @builder.state()
 @dataclass
@@ -274,7 +280,9 @@ class RequiresFirstState2(object):
     def justrequired(self) -> tuple[object, int]:
         return (self.other_state, 2)
 
+
 RequiresFirstState1.justrequired.enter(RequiresFirstState2)
+
 
 @builder.state()
 @dataclass
@@ -311,6 +319,7 @@ class Ephemeral:
     @builder.handle(SomeInputs.persistent, enter=CoreDataRequirer)
     def persistent(self) -> None:
         pass
+
 
 FirstState.ephemeral.enter(Ephemeral)
 
