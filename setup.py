@@ -15,7 +15,6 @@ setup(
     packages=find_packages(exclude=[]),
     package_dir={'automat': 'automat'},
     setup_requires=[
-        'wheel',
         'setuptools-scm',
     ],
     install_requires=[
