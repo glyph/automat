@@ -42,6 +42,7 @@ class Automaton(object):
         """
         self._initialState = _NO_STATE
         self._transitions = set()
+        self._unhandledTransition = None
 
     @property
     def initialState(self):
@@ -80,6 +81,9 @@ class Automaton(object):
                     )
                 )
         self._transitions.add((inState, inputSymbol, outState, tuple(outputSymbols)))
+
+    def unhandledTransition(self, outState, outputSymbols):
+        self._unhandledTransition = (outState, outputSymbols)
 
     def allTransitions(self):
         """
@@ -126,7 +130,9 @@ class Automaton(object):
         for (anInState, anInputSymbol, outState, outputSymbols) in self._transitions:
             if (inState, inputSymbol) == (anInState, anInputSymbol):
                 return (outState, list(outputSymbols))
-        raise NoTransition(state=inState, symbol=inputSymbol)
+        if self._unhandledTransition is None:
+            raise NoTransition(state=inState, symbol=inputSymbol)
+        return self._unhandledTransition
 
 
 class Transitioner(object):

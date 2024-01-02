@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.10", "3.11"]
+        python: ["3.8", "3.10", "3.11"]
         TOX_ENV: ["extras", "noextras", "mypy"]
         include:
           - python: "3.11"
