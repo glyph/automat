@@ -19,7 +19,6 @@ setup(
     ],
     install_requires=[
         "attrs>=19.2.0",
-        "six",
     ],
     extras_require={
         "visualize": ["graphviz>0.5.1",
