@@ -704,6 +704,31 @@ class MethodicalTests(TestCase):
             },
         )
 
+    def test_allowBasicTypeAnnotations(self):
+        """
+        L{MethodicalMachine} can operate with type annotations on inputs and outputs.
+        """
+
+        class Mechanism(object):
+            m = MethodicalMachine()
+
+            @m.input()
+            def an_input(self, arg: int):
+                "An input"
+
+            @m.output()
+            def an_output(self, arg: int) -> int:
+                return arg + 1
+
+            @m.state(initial=True)
+            def state(self):
+                "A state"
+
+            state.upon(an_input, enter=state, outputs=[an_output])
+
+        mechanism = Mechanism()
+        assert mechanism.an_input(2) == [3]
+
 
 # FIXME: error for wrong types on any call to _oneTransition
 # FIXME: better public API for .upon; maybe a context manager?
