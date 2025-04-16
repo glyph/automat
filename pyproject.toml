@@ -3,6 +3,7 @@ requires = [
   "setuptools >= 35.0.2",
   "wheel >= 0.29.0",
   "setuptools-scm",
+  "hatch-vcs",
 ]
 build-backend = "setuptools.build_meta"
 
@@ -56,3 +57,7 @@ where = ["src"]
 
 [tool.setuptools_scm]
 # No configuration required, but the section needs to exist?
+
+[tool.hatch]
+version.source = "vcs"
+
