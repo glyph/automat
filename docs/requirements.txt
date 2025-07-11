@@ -60,7 +60,7 @@ pydoctor==24.3.3
     # via -r requirements.in
 pygments==2.18.0
     # via sphinx
-requests==2.32.3
+requests==2.32.4
     # via
     #   cachecontrol
     #   pydoctor
