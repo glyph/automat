@@ -96,7 +96,7 @@ twisted==24.7.0
     # via pydoctor
 typing-extensions==4.12.2
     # via twisted
-urllib3==2.2.2
+urllib3==2.5.0
     # via
     #   pydoctor
     #   requests
