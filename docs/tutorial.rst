@@ -334,7 +334,7 @@ behavior is much simpler:
 
 You can download the full example here:
 
-- :download:`examples/garage_door_security.py`
+- :download:`examples/automat_card.py`
 
 Reentrancy
 ----------
