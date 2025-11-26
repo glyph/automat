@@ -54,14 +54,20 @@ class Automaton(Generic[State, Input, Output]):
     Note that this is not the machine itself; it is immutable.
     """
 
-    def __init__(self, initial: State | None = None) -> None:
+    def __init__(
+        self, initial: State | None = None, error: State | None = None
+    ) -> None:
         """
         Initialize the set of transitions and the initial state.
         """
         if initial is None:
             initial = _NO_STATE  # type:ignore[assignment]
         assert initial is not None
+        if error is None:
+            error = _NO_STATE  # type:ignore[assignment]
+        assert error is not None
         self._initialState: State = initial
+        self._errorState: State = error
         self._transitions: set[tuple[State, Input, State, Sequence[Output]]] = set()
         self._unhandledTransition: Optional[tuple[State, Sequence[Output]]] = None
 
@@ -85,6 +91,24 @@ class Automaton(Generic[State, Input, Output]):
             )
 
         self._initialState = state
+
+    @property
+    def errorState(self) -> State:
+        """
+        Return this automaton's error state.
+        """
+        return self._errorState
+
+    @errorState.setter
+    def errorState(self, state: State) -> None:
+        """
+        Set this automaton's error state. Raises a ValueError if
+        this automaton already has an error state.
+        """
+        if self._errorState is not _NO_STATE:
+            raise ValueError("error state already set to {}".format(self._errorState))
+
+        self._errorState = state
 
     def addTransition(
         self,
@@ -201,3 +225,13 @@ class Transitioner(Generic[State, Input, Output]):
             outTracer = self._tracer(self._state, inputSymbol, outState)
         self._state = outState
         return (outputSymbols, outTracer)
+
+    def handleError(self, inputError: BaseException) -> None:
+        """
+        Put state machine into explicit error state.
+        """
+        # FIXME: Add support for transition outputs to error state
+        # if self._automaton.errorState not in self._automaton.states():
+        #     raise ValueError("No error state defined")
+        if self._automaton.errorState is not _NO_STATE:
+            self._state = self._automaton.errorState

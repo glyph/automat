@@ -426,6 +426,9 @@ def implementMethod(
                 # run reentrant outputs.  not clear that state-teardown outputs are
                 # necessary
                 result = output(self, dataAtStart, *args, **kwargs)
+        except BaseException as ex:
+            transitioner.handleError(ex)
+            raise
         finally:
             self.__automat_postponed__ = None
         while postponed:
@@ -696,6 +699,11 @@ class TypeMachineBuilder(Generic[InputProtocol, Core]):
         else:
             assert not self._initial, "initial state cannot require state-specific data"
             return TypedDataState(name, self, dataFactory)
+
+    def error_state(self, name: str) -> TypedState[InputProtocol, Core]:
+        state = self.state(name=name)
+        self._automaton.errorState = state
+        return state
 
     def build(self) -> TypeMachine[InputProtocol, Core]:
         """
