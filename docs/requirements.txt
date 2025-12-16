@@ -34,7 +34,7 @@ docutils==0.20.1
     #   pydoctor
     #   sphinx
     #   sphinx-rtd-theme
-filelock==3.15.4
+filelock==3.20.1
     # via cachecontrol
 hyperlink==21.0.0
     # via twisted
