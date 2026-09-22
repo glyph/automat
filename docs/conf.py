@@ -44,28 +44,33 @@ import subprocess
 _project_root = pathlib.Path(__file__).parent.parent
 _source_root = _project_root / "src"
 
-_git_reference = subprocess.run(
-    ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-    text=True,
-    encoding="utf8",
-    capture_output=True,
-    check=True,
-).stdout
-
-
-# Try to find URL fragment for the GitHub source page based on current
-# branch or tag.
-
-if _git_reference == "HEAD":
-    # It looks like the branch has no name.
-    # Fallback to commit ID.
-    _git_reference = subprocess.getoutput("git rev-parse HEAD")
-
-if os.environ.get("READTHEDOCS", "") == "True":
+def _source_reference() -> str:
+    """Use a hosted tag, checkout revision, or installed release for source links."""
     rtd_version = os.environ.get("READTHEDOCS_VERSION", "")
-    if "." in rtd_version:
-        # It looks like we have a tag build.
-        _git_reference = rtd_version
+    if os.environ.get("READTHEDOCS", "") == "True" and "." in rtd_version:
+        return rtd_version
+
+    def git_revision(*args: str) -> str:
+        return subprocess.run(
+            ["git", "rev-parse", *args],
+            cwd=_project_root,
+            text=True,
+            encoding="utf8",
+            capture_output=True,
+            check=True,
+        ).stdout.strip()
+
+    try:
+        reference = git_revision("--abbrev-ref", "HEAD")
+        return git_revision("HEAD") if reference == "HEAD" else reference
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        # Source distributions have no Git metadata, and may not have Git at all.
+        from importlib.metadata import version
+
+        return "v" + version("automat")
+
+
+_git_reference = _source_reference()
 
 pydoctor_args = [
     # pydoctor should not fail the sphinx build, we have another tox environment for that.
