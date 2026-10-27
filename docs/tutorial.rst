@@ -197,7 +197,7 @@ Obviously, mypy will also complain that our test callers are missing the
 ``remoteID`` argument as well, so if we change them to pass along some value
 like so:
 
-.. literalinclude:: examples/garage_door.py
+.. literalinclude:: examples/garage_door_security.py
    :start-after: do open
    :end-before: end open
 
