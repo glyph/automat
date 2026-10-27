@@ -7,12 +7,7 @@ from dataclasses import dataclass, field
 from functools import wraps
 from inspect import getfullargspec as getArgsSpec
 from itertools import count
-from typing import Any, Callable, Hashable, Iterable, TypeVar
-
-if sys.version_info < (3, 10):
-    from typing_extensions import TypeAlias
-else:
-    from typing import TypeAlias
+from typing import Any, Callable, Hashable, Iterable, TypeAlias, TypeVar
 
 from ._core import Automaton, OutputTracer, Tracer, Transitioner
 from ._introspection import preserveName
