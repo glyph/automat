@@ -11,10 +11,7 @@ import sys
 from itertools import chain
 from typing import Callable, Generic, Optional, Sequence, TypeVar, Hashable
 
-if sys.version_info >= (3, 10):
-    from typing import TypeAlias
-else:
-    from typing_extensions import TypeAlias
+from typing import TypeAlias
 
 _NO_STATE = "<no state>"
 State = TypeVar("State", bound=Hashable)
