@@ -25,10 +25,7 @@ except ImportError:
 else:
     hasInterface = True
 
-if sys.version_info < (3, 10):
-    from typing_extensions import Concatenate, ParamSpec, TypeAlias
-else:
-    from typing import Concatenate, ParamSpec, TypeAlias
+from typing import Concatenate, ParamSpec, TypeAlias
 
 from ._core import Automaton, Transitioner
 from ._runtimeproto import (
